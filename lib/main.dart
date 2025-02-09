@@ -4,7 +4,12 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load();
+  try {
+    await dotenv.load();
+  } catch (e) {
+    print('Error loading .env file: $e');
+    // Provide fallback or handle error
+  }
   runApp(const MyApp());
 }
 
