@@ -15,13 +15,16 @@ class Recommendation {
 
   factory Recommendation.fromJson(Map<String, dynamic> json) {
     return Recommendation(
-      currentPhase: json['current_phase'],
-      daysSinceLastPeriod: json['days_since_last_period'],
-      keywords: List<String>.from(json['keywords']),
-      poeticMessage: json['poetic_message'],
+      currentPhase: json['current_phase'] as String? ?? 'Unknown',
+      daysSinceLastPeriod: json['days_since_last_period'] as int? ?? 0,
+      keywords: List<String>.from(json['keywords'] ?? []),
+      poeticMessage: json['poetic_message'] as String? ?? 'No message available',
       recommendations: Map<String, List<String>>.from(
-        json['recommendations'].map(
-          (key, value) => MapEntry(key, List<String>.from(value)),
+        (json['recommendations'] ?? {}).map(
+          (key, value) => MapEntry(
+            key as String,
+            List<String>.from(value ?? []),
+          ),
         ),
       ),
     );

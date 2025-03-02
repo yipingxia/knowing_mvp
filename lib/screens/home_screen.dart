@@ -3,8 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/openai_service.dart';
 import '../models/recommendation.dart';
 import '../widgets/tarot_card.dart';
-import '../models/journal_entry.dart';
-import '../screens/journal_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
