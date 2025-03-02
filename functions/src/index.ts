@@ -58,12 +58,63 @@ export const getRecommendations = functions
       currentDate: data.currentDate
     });
 
+    const systemPrompt = `You are a menstrual health expert and data analyst. Analyze the user's journal entry to:
+    1. Extract structured data about their day
+    2. Calculate their current menstrual phase
+    3. Provide recommendations
+
+    IMPORTANT: Your response must be a valid JSON object with this exact structure:
+    {
+      "parsed_data": {
+        "period_state": {
+          "is_active": boolean,
+          "flow": "none" | "light" | "medium" | "heavy",
+          "spotting": boolean
+        },
+        "symptoms": {
+          "physical": ["symptom1", "symptom2"],  // Extract mentioned physical symptoms
+          "emotional": ["mood1", "mood2"]        // Extract emotional states
+        },
+        "lifestyle": {
+          "sleep": {
+            "mentioned": boolean,
+            "quality": "poor" | "fair" | "good" | null,
+            "hours": number | null
+          },
+          "food": {
+            "meals": ["meal1", "meal2"],         // Extract mentioned foods
+            "cravings": ["craving1", "craving2"],
+            "hydration_mentioned": boolean
+          },
+          "exercise": {
+            "mentioned": boolean,
+            "type": ["activity1", "activity2"],
+            "duration_minutes": number | null
+          }
+        }
+      },
+      "cycle_analysis": {
+        "current_phase": "Menstrual" | "Follicular" | "Ovulatory" | "Luteal",
+        "days_since_last_period": number,
+        "keywords": ["keyword1", "keyword2", "keyword3"],
+        "poetic_message": string
+      },
+      "recommendations": {
+        "exercise": ["pointer1", "pointer2", "pointer3"],
+        "nutrition": ["pointer1", "pointer2", "pointer3"],
+        "emotional_wellbeing": ["pointer1", "pointer2", "pointer3"],
+        "symptoms_management": ["pointer1", "pointer2", "pointer3"]
+      }
+    }
+
+    Extract data conservatively - only include information explicitly mentioned in the journal entry. Use null or empty arrays for data not mentioned.`;
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4',
       messages: [
         {
           role: 'system',
-          content: data.systemPrompt
+          content: systemPrompt
         },
         {
           role: 'user',
@@ -79,8 +130,50 @@ export const getRecommendations = functions
 
     console.log('OpenAI response received:', completion.choices[0].message);
     
-    const jsonResponse = JSON.parse(completion.choices[0].message.content ?? '{}');
-    return jsonResponse;
+    // Parse the response and restructure it
+    const aiResponse = JSON.parse(completion.choices[0].message.content ?? '{}');
+    
+    // Restructure to match our expected format
+    const response = {
+      parsed_data: {
+        period_state: {
+          is_active: aiResponse.current_phase === "Menstrual",
+          flow: "none",  // This should be extracted from the journal
+          spotting: false  // This should be extracted from the journal
+        },
+        symptoms: {
+          physical: aiResponse.keywords.filter((k: string) => k.includes("pain") || k.includes("cramps")),
+          emotional: aiResponse.keywords.filter((k: string) => k.includes("mood") || k.includes("feeling"))
+        },
+        lifestyle: {
+          sleep: {
+            mentioned: false,
+            quality: null,
+            hours: null
+          },
+          food: {
+            meals: [],
+            cravings: [],
+            hydration_mentioned: false
+          },
+          exercise: {
+            mentioned: false,
+            type: [],
+            duration_minutes: null
+          }
+        }
+      },
+      cycle_analysis: {
+        current_phase: aiResponse.current_phase,
+        days_since_last_period: aiResponse.days_since_last_period,
+        keywords: aiResponse.keywords,
+        poetic_message: aiResponse.poetic_message
+      },
+      recommendations: aiResponse.recommendations
+    };
+
+    console.log('Structured response:', response);
+    return response;
   } catch (error) {
     console.error('Detailed error:', error);
     throw new functions.https.HttpsError('internal', `Failed to get recommendations: ${error instanceof Error ? error.message : 'Unknown error'}`);
