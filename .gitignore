@@ -26,19 +26,21 @@
 .pub/
 /build/
 
-# Firebase
-.firebase/
-.firebaserc
-firebase-debug.log
-**/firebase-debug.log
-**/.runtimeconfig.json
-
 # Environment files
 .env
-functions/.env
 **/.env
+functions/.env
+.runtimeconfig.json
+**/.runtimeconfig.json
+functions/.runtimeconfig.json
 
 # iOS
 **/ios/Pods/
 **/ios/.symlinks/
 **/ios/Flutter/Flutter.podspec
+
+# Firebase
+.firebase/
+.firebaserc
+firebase-debug.log
+**/firebase-debug.log
