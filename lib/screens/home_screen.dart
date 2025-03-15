@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/openai_service.dart';
 import '../models/recommendation.dart';
 import '../widgets/tarot_card.dart';
+import '../screens/interactive_input.dart';
+import 'journal_entries_list.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -443,6 +445,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  void _navigateToJournalEntries() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const JournalEntriesListScreen(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -462,6 +473,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_chart),
+            onPressed: _navigateToJournalEntries,
+            tooltip: 'Journal Entries',
+          ),
+        ],
         elevation: 0,
       ),
       body: Center(
@@ -690,6 +708,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _recommendation = Recommendation.fromJson(response);
         _isLoading = false;
       });
+
+      // Navigate to interactive input with the journal entry
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => InteractiveInputScreen(
+              selectedDate: DateTime.now(),
+            ),
+          ),
+        );
+      }
     } catch (e) {
       setState(() {
         _isLoading = false;

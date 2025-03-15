@@ -16,7 +16,113 @@ interface RecommendationRequest {
   currentDate: string;
 }
 
+interface NutritionRequest {
+  nutritionText: string;
+  systemPrompt: string;
+  exerciseText?: string;  // Optional field for exercise information
+}
+
 // Specify the region explicitly
+export const analyzeNutrition = functions
+  .region('asia-southeast1')
+  .https.onCall(async (data: NutritionRequest) => {
+  try {
+    console.log(`Analyzing nutrition content...`);
+    
+    let apiKey: string | undefined;
+    
+    try {
+      apiKey = functions.config().openai?.key;
+      console.log('Firebase config key available:', Boolean(apiKey));
+    } catch (e) {
+      console.log('Error getting Firebase config:', e);
+    }
+
+    if (!apiKey) {
+      apiKey = process.env.OPENAI_API_KEY;
+      console.log('Falling back to env var');
+    }
+
+    if (!apiKey) {
+      throw new Error('OpenAI API key not found in any configuration');
+    }
+
+    const openai = new OpenAI({
+      apiKey: apiKey
+    });
+
+    // Default system prompt if none provided
+    const systemPrompt = data.systemPrompt || `You are a nutrition and exercise analyzer. Analyze the text and extract information about nutrition and exercise intensity.
+
+IMPORTANT: You must return ONLY a JSON object with NO additional text. The response must follow this exact format:
+{
+  "fiber": number,  // Fiber content in grams
+  "protein": number, // Protein content in grams
+  "bodyStressLevel": number | null  // Scale of 1-10, where 1 is very light and 10 is extremely intense. Null if no exercise mentioned.
+}
+
+For nutrition, if exact values are not mentioned, make a reasonable estimate based on the food items described.
+For example:
+- A typical salad with leafy greens: {"fiber": 4, "protein": 2, "bodyStressLevel": null}
+- A chicken breast with rice: {"fiber": 1, "protein": 25, "bodyStressLevel": null}
+- A bowl of oatmeal with fruit: {"fiber": 6, "protein": 5, "bodyStressLevel": null}
+
+For exercise stress levels:
+- Light walking (1-2): Very low impact, suitable for recovery
+- Yoga or stretching (2-4): Low to moderate stress depending on intensity
+- Jogging or moderate cardio (4-6): Moderate stress on body
+- High-intensity interval training (7-8): High stress, significant impact
+- Heavy weightlifting or intense cardio (8-10): Very high stress on body`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt
+        },
+        {
+          role: 'user',
+          content: `${data.nutritionText}${data.exerciseText ? '\nExercise: ' + data.exerciseText : ''}`
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 100
+    });
+
+    console.log('Raw OpenAI response:', completion);
+    
+    const messageContent = completion.choices[0].message.content;
+    if (!messageContent) {
+      throw new Error('OpenAI returned empty response');
+    }
+
+    try {
+      // Parse the content string into JSON
+      console.log('About to parse message content:', messageContent);
+      const parsedContent = JSON.parse(messageContent);
+      
+      // Validate the response format
+      if (typeof parsedContent.fiber !== 'number' || typeof parsedContent.protein !== 'number') {
+        throw new Error('Invalid nutrition analysis format');
+      }
+      
+      // bodyStressLevel can be null or a number
+      if (parsedContent.bodyStressLevel !== null && typeof parsedContent.bodyStressLevel !== 'number') {
+        throw new Error('Invalid body stress level format');
+      }
+      
+      return parsedContent;
+    } catch (e) {
+      console.error('Error parsing analysis:', e);
+      throw new Error('Failed to parse analysis response');
+    }
+  } catch (e: any) {
+    console.error('Error in nutrition analysis:', e);
+    throw new functions.https.HttpsError('internal', e.message || 'Unknown error');
+  }
+});
+
 export const getRecommendations = functions
   .region('asia-southeast1')
   .https.onCall(async (data: RecommendationRequest) => {

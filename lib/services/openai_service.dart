@@ -78,4 +78,73 @@ Do not include any explanatory text outside the JSON structure. The response mus
       rethrow;
     }
   }
+
+  Future<Map<String, dynamic>> analyzeNutrition(String text, {bool isExerciseOnly = false}) async {
+    try {
+      print('Analyzing content...');
+      
+      // Set origin for local development
+      if (const bool.fromEnvironment('dart.vm.product') == false) {
+        print('Running in development mode');
+        functions.useFunctionsEmulator('localhost', 5001);
+      }
+
+      print('Making function call...');
+      final result = await functions.httpsCallable('analyzeNutrition').call({
+        'nutritionText': text,
+        'exerciseText': text,
+        'systemPrompt': '''
+        You are a nutrition and exercise expert. Analyze the given text.
+        
+        For nutrition content:
+        - Estimate the fiber and protein content if food items are mentioned
+        
+        For exercise content:
+        - Estimate the body stress level on a scale of 1-10 if exercise activities are mentioned
+        - Consider intensity, duration, and type of exercise
+        - Lower intensity (walking, gentle yoga): 1-3
+        - Moderate intensity (jogging, cycling): 4-7
+        - High intensity (HIIT, heavy lifting): 8-10
+        
+        Return a JSON object with all applicable fields:
+        {
+          "fiber": number (in grams),
+          "protein": number (in grams),
+          "bodyStressLevel": number (1-10)
+        }
+        
+        Only include fields that are relevant to the content provided.
+        Be conservative in your estimates. If unsure, estimate on the lower side.
+        Do not include any explanatory text, only the JSON object.
+        '''
+      });
+      
+      print('Function call completed. Result: ${result.data}');
+      
+      if (result.data is Map) {
+        Map<String, dynamic> response = {};
+        
+        // Include nutrition metrics if present
+        if (result.data['fiber'] != null) {
+          response['fiber'] = (result.data['fiber'] as num).toDouble();
+        }
+        if (result.data['protein'] != null) {
+          response['protein'] = (result.data['protein'] as num).toDouble();
+        }
+        
+        // Include body stress level if present
+        if (result.data['bodyStressLevel'] != null) {
+          response['bodyStressLevel'] = (result.data['bodyStressLevel'] as num).toDouble();
+        }
+        
+        return response;
+      }
+      
+      throw Exception('Invalid response format from analysis');
+    } catch (e, stackTrace) {
+      print('Error in content analysis: $e');
+      print('Stack trace: $stackTrace');
+      rethrow;
+    }
+  }
 } 
