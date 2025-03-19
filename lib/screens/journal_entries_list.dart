@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/journal_entry.dart';
+import '../services/journal_service.dart';
 import 'interactive_input.dart';
 
 class JournalEntriesListScreen extends StatefulWidget {
@@ -11,38 +13,15 @@ class JournalEntriesListScreen extends StatefulWidget {
 }
 
 class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
-  // TODO: Replace with actual data from storage
-  List<JournalEntry> entries = [
-    JournalEntry(
-      date: DateTime.now().subtract(const Duration(days: 1)),
-      phase: 'Follicular',
-      energyLevel: 75,
-      sleepQualityIndex: 3,
-    ),
-    JournalEntry(
-      date: DateTime.now().subtract(const Duration(days: 2)),
-      phase: 'Menstrual',
-      energyLevel: 60,
-      sleepQualityIndex: 2,
-    ),
-  ];
+  late final JournalService _journalService;
+  
+  @override
+  void initState() {
+    super.initState();
+    _journalService = JournalService(FirebaseFirestore.instance);
+  }
 
   Future<void> _addOrUpdateEntry(DateTime selectedDate, [JournalEntry? initialEntry]) async {
-    void updateEntry(JournalEntry entry) {
-      setState(() {
-        // Remove existing entry for the same date if it exists
-        entries.removeWhere((e) => 
-          e.date.year == entry.date.year && 
-          e.date.month == entry.date.month && 
-          e.date.day == entry.date.day
-        );
-        // Add the new entry
-        entries.add(entry);
-        // Sort entries by date (newest first)
-        entries.sort((a, b) => b.date.compareTo(a.date));
-      });
-    }
-
     final result = await Navigator.push<JournalEntry>(
       context,
       MaterialPageRoute(
@@ -54,7 +33,7 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
     );
 
     if (result != null) {
-      updateEntry(result);
+      await _journalService.saveEntry(result);
     }
   }
 
@@ -74,18 +53,39 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
         elevation: 0,
         centerTitle: true,
       ),
-      body: GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 0.85,
-        ),
-        itemCount: entries.length,
-        itemBuilder: (context, index) {
-          final entry = entries[index];
-          return _buildEntryTile(context, entry);
+      body: StreamBuilder<List<JournalEntry>>(
+        stream: _journalService.getAllEntries(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final entries = snapshot.data ?? [];
+
+          if (entries.isEmpty) {
+            return const Center(
+              child: Text('No entries yet. Add your first entry!'),
+            );
+          }
+
+          return GridView.builder(
+            padding: const EdgeInsets.all(16),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: 0.85,
+            ),
+            itemCount: entries.length,
+            itemBuilder: (context, index) {
+              final entry = entries[index];
+              return _buildEntryTile(context, entry);
+            },
+          );
         },
       ),
       floatingActionButton: FloatingActionButton(
