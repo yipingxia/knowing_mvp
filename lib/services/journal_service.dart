@@ -9,7 +9,7 @@ class JournalService {
   
   // Collection reference for journal entries
   CollectionReference<Map<String, dynamic>> get _entriesCollection => 
-      _firestore.collection('journal_entries');
+      _firestore.collection('dailyEntries');
 
   // Add or update a journal entry
   Future<void> saveEntry(JournalEntry entry) async {
@@ -20,7 +20,7 @@ class JournalService {
       print('Using document ID: $documentId');
       
       final Map<String, dynamic> entryData = {
-        'date': entry.date,
+        'date': Timestamp.fromDate(entry.date),
         'phase': entry.phase,
         'energyLevel': entry.energyLevel,
         'sleepQualityIndex': entry.sleepQualityIndex,
@@ -81,8 +81,12 @@ class JournalService {
 
   // Convert Firestore data to JournalEntry object
   JournalEntry _convertToJournalEntry(Map<String, dynamic> data) {
+    final date = data['date'] is Timestamp 
+        ? (data['date'] as Timestamp).toDate()
+        : DateTime.parse(data['date'].toString());
+        
     return JournalEntry(
-      date: (data['date'] as Timestamp).toDate(),
+      date: date,
       phase: data['phase'] as String,
       energyLevel: (data['energyLevel'] as num).toDouble(),
       sleepQualityIndex: data['sleepQualityIndex'] as int,

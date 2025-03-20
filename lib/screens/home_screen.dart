@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/openai_service.dart';
+import '../services/daily_log_service.dart';
 import '../models/recommendation.dart';
+import '../models/journal_entry.dart';
 import '../widgets/tarot_card.dart';
 import '../screens/interactive_input.dart';
 import 'journal_entries_list.dart';
@@ -73,6 +76,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final TextEditingController _journalController = TextEditingController();
   DateTime? _lastPeriodDate;
   final OpenAIService _openAIService = OpenAIService();
+  final DailyLogService _dailyLogService = DailyLogService(FirebaseFirestore.instance);
   bool _isLoading = false;
   bool _isEditing = true;
   Recommendation? _recommendation;
@@ -113,6 +117,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         );
       }
     });
+
+    // Load today's log if it exists
+    _loadTodayLog();
+  }
+
+  Future<void> _loadTodayLog() async {
+    try {
+      final todayLog = await _dailyLogService.getTodayLog();
+      if (todayLog != null) {
+        setState(() {
+          _journalController.text = todayLog.notes;
+          _lastPeriodDate = todayLog.lastPeriodDate;
+          _isEditing = false;
+          if (todayLog.recommendations != null) {
+            _recommendation = Recommendation.fromJson(todayLog.recommendations!);
+          }
+        });
+      }
+    } catch (e) {
+      print('Error loading today\'s log: $e');
+      // Don't show error to user, just leave the form empty
+    }
   }
 
   @override
@@ -694,6 +720,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _isEditing = false;  // Immediately switch to view mode
     });
 
+    // Navigate to interactive input immediately
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => InteractiveInputScreen(
+            selectedDate: DateTime.now(),
+          ),
+        ),
+      );
+    }
+
+    // Get recommendations in the background
     try {
       final response = await _openAIService.getRecommendations(
         journalEntry: _journalController.text,
@@ -704,22 +743,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         throw Exception(response['error']);
       }
 
+      final recommendation = Recommendation.fromJson(response);
+      
+      // Create and save a journal entry for the daily log
+      final journalEntry = JournalEntry(
+        date: DateTime.now(),
+        phase: recommendation.currentPhase,
+        energyLevel: 0,  // Not applicable for daily log
+        sleepQualityIndex: 0,  // Not applicable for daily log
+        notes: _journalController.text,
+        lastPeriodDate: _lastPeriodDate,
+        recommendations: response,
+      );
+
+      // Save to dailyLogs collection
+      await _dailyLogService.saveLog(journalEntry);
+
       setState(() {
-        _recommendation = Recommendation.fromJson(response);
+        _recommendation = recommendation;
         _isLoading = false;
       });
-
-      // Navigate to interactive input with the journal entry
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => InteractiveInputScreen(
-              selectedDate: DateTime.now(),
-            ),
-          ),
-        );
-      }
     } catch (e) {
       setState(() {
         _isLoading = false;

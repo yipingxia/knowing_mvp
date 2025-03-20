@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; // For formatting the current date
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 import '../models/journal_entry.dart';
+import '../models/recommendation.dart';
 import '../services/openai_service.dart';
+import '../services/recommendations_service.dart';
+import '../services/daily_log_service.dart';
 
 class InteractiveInputScreen extends StatefulWidget {
   final DateTime selectedDate;
@@ -18,9 +23,9 @@ class InteractiveInputScreen extends StatefulWidget {
 }
 
 class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
-  double _energyLevel = 70; // Default energy level
-  String _selectedPhase = 'Follicular';
-  int _sleepQualityIndex = 2; // Default sleep quality (Fair)
+  double? _energyLevel; // Remove default value
+  String _phase = ''; // Will be populated from daily log
+  int? _sleepQualityIndex; // Remove default value
   bool _isPhysicalActive = false;
   bool _isEmotionalActive = true;
   bool _isLifestyleActive = false;
@@ -37,39 +42,126 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
   late final TextEditingController _nutritionController;
   late final TextEditingController _notesController;
 
-  final List<String> _phases = ['Menstrual', 'Follicular', 'Ovulatory', 'Luteal'];
   final List<String> _sleepQualities = ['Poor', 'Barely Enough', 'Fair', 'Good', 'Rested'];
 
   final OpenAIService _openAIService = OpenAIService();
   bool _isAnalyzing = false;
+  bool _isLoadingRecommendations = true;
+  Recommendation? _recommendation;
+  late final RecommendationsService _recommendationsService;
+  late final DailyLogService _dailyLogService;
+  StreamSubscription<Recommendation?>? _recommendationsSubscription;
 
   @override
   void initState() {
     super.initState();
     
+    // Initialize services
+    _recommendationsService = RecommendationsService(FirebaseFirestore.instance);
+    _dailyLogService = DailyLogService(FirebaseFirestore.instance);
+    
+    // Initialize controllers with empty values first
+    _exerciseController = TextEditingController();
+    _emotionController = TextEditingController();
+    _symptomsController = TextEditingController();
+    _nutritionController = TextEditingController();
+    _notesController = TextEditingController();
+
     // Initialize with data from initial entry if provided
     if (widget.initialEntry != null) {
       _energyLevel = widget.initialEntry!.energyLevel;
-      _selectedPhase = widget.initialEntry!.phase;
+      _phase = widget.initialEntry!.phase;
       _sleepQualityIndex = widget.initialEntry!.sleepQualityIndex;
       _exercise = widget.initialEntry!.exercise;
       _emotion = widget.initialEntry!.emotion;
       _symptoms = widget.initialEntry!.symptoms;
       _nutrition = widget.initialEntry!.nutrition;
       _notes = widget.initialEntry!.notes;
+      
+      // Update controllers
+      _exerciseController.text = _exercise;
+      _emotionController.text = _emotion;
+      _symptomsController.text = _symptoms;
+      _nutritionController.text = _nutrition;
+      _notesController.text = _notes;
     }
 
-    // Initialize controllers with current values
-    _exerciseController = TextEditingController(text: _exercise);
-    _emotionController = TextEditingController(text: _emotion);
-    _symptomsController = TextEditingController(text: _symptoms);
-    _nutritionController = TextEditingController(text: _nutrition);
-    _notesController = TextEditingController(text: _notes);
+    // Load today's log and recommendations
+    _loadTodayLog();
+    _watchRecommendations();
+  }
+
+  Future<void> _loadTodayLog() async {
+    try {
+      final todayLog = await _dailyLogService.getTodayLog();
+      if (todayLog != null && mounted) {
+        setState(() {
+          // Always update phase from today's log
+          _phase = todayLog.phase;
+          
+          // Only update other fields if no initial entry was provided
+          if (widget.initialEntry == null) {
+            _energyLevel = todayLog.energyLevel;
+            _sleepQualityIndex = todayLog.sleepQualityIndex;
+            
+            // Parse the notes field to extract individual components
+            final notes = todayLog.notes;
+            if (notes.isNotEmpty) {
+              final lines = notes.split('\n');
+              for (final line in lines) {
+                if (line.startsWith('Nutrition: ')) {
+                  _nutrition = line.substring('Nutrition: '.length);
+                  _nutritionController.text = _nutrition;
+                } else if (line.startsWith('Exercise: ')) {
+                  _exercise = line.substring('Exercise: '.length);
+                  _exerciseController.text = _exercise;
+                } else if (line.startsWith('Emotion: ')) {
+                  _emotion = line.substring('Emotion: '.length);
+                  _emotionController.text = _emotion;
+                } else if (line.startsWith('Symptoms: ')) {
+                  _symptoms = line.substring('Symptoms: '.length);
+                  _symptomsController.text = _symptoms;
+                } else if (line.startsWith('\nAdditional Notes:\n')) {
+                  _notes = line.substring('\nAdditional Notes:\n'.length);
+                  _notesController.text = _notes;
+                }
+              }
+            }
+          }
+        });
+      }
+    } catch (e) {
+      print('Error loading today\'s log: $e');
+      // Don't show error to user, just leave the form empty
+    }
+  }
+
+  void _watchRecommendations() {
+    _recommendationsSubscription = _recommendationsService
+        .watchRecommendations(widget.selectedDate)
+        .listen(
+          (recommendation) {
+            if (mounted) {
+              setState(() {
+                _recommendation = recommendation;
+                _isLoadingRecommendations = false;
+              });
+            }
+          },
+          onError: (error) {
+            print('Error watching recommendations: $error');
+            if (mounted) {
+              setState(() {
+                _isLoadingRecommendations = false;
+              });
+            }
+          },
+        );
   }
 
   @override
   void dispose() {
-    // Dispose controllers
+    _recommendationsSubscription?.cancel();
     _exerciseController.dispose();
     _emotionController.dispose();
     _symptomsController.dispose();
@@ -94,9 +186,9 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
       // Create initial entry
       final entry = JournalEntry(
         date: widget.selectedDate,
-        phase: _selectedPhase,
-        energyLevel: _energyLevel,
-        sleepQualityIndex: _sleepQualityIndex,
+        phase: _phase,
+        energyLevel: _energyLevel ?? 0,
+        sleepQualityIndex: _sleepQualityIndex ?? 0,
         exercise: _exercise,
         emotion: _emotion,
         symptoms: _symptoms,
@@ -144,6 +236,25 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
           // Continue without body stress level if analysis fails
         }
       }
+
+      // Compile notes from all fields
+      final compiledNotes = [
+        if (_nutrition.isNotEmpty) 'Nutrition: $_nutrition',
+        if (_exercise.isNotEmpty) 'Exercise: $_exercise',
+        if (_emotion.isNotEmpty) 'Emotion: $_emotion',
+        if (_symptoms.isNotEmpty) 'Symptoms: $_symptoms',
+        if (_notes.isNotEmpty) '\nAdditional Notes:\n$_notes',
+      ].join('\n');
+
+      // Update the daily log with the compiled notes
+      final dailyLogEntry = JournalEntry(
+        date: widget.selectedDate,
+        phase: _phase,
+        energyLevel: _energyLevel ?? 0,
+        sleepQualityIndex: _sleepQualityIndex ?? 0,
+        notes: compiledNotes,
+      );
+      await _dailyLogService.saveLog(dailyLogEntry);
       
       // Return the entry with any successful analyses
       Navigator.pop(context, updatedEntry);
@@ -204,7 +315,7 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
                           fontSize: 14,
                         )
                       ),
-                      Text(_selectedPhase,
+                      Text(_phase,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
@@ -221,7 +332,8 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
                           fontSize: 14,
                         )
                       ),
-                      Text('${_energyLevel.round()}%',
+                      Text(
+                        _energyLevel != null ? '${_energyLevel!.round()}%' : '--',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
@@ -230,40 +342,6 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
                     ],
                   ),
                 ],
-              ),
-
-              const SizedBox(height: 40),
-
-              // Phase selector
-              SizedBox(
-                height: 40,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _phases.length,
-                  itemBuilder: (context, index) {
-                    final phase = _phases[index];
-                    final isSelected = phase == _selectedPhase;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(phase),
-                        selected: isSelected,
-                        onSelected: (bool selected) {
-                          if (selected) {
-                            setState(() => _selectedPhase = phase);
-                          }
-                        },
-                        backgroundColor: Colors.grey[200],
-                        selectedColor: Colors.black87,
-                        labelStyle: TextStyle(
-                          color: isSelected ? Colors.white : Colors.black87,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    );
-                  },
-                ),
               ),
 
               const SizedBox(height: 40),
@@ -278,7 +356,7 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
                       children: [
                         // Energy indicator
                         Text(
-                          '${_energyLevel.round()}%',
+                          _energyLevel != null ? '${_energyLevel!.round()}%' : '--',
                           style: const TextStyle(
                             fontSize: 48,
                             fontWeight: FontWeight.w300,
@@ -311,13 +389,20 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
                                 overlayShape: const RoundSliderOverlayShape(overlayRadius: 28.0),
                               ),
                               child: Slider(
-                                value: _energyLevel,
+                                value: _energyLevel ?? 0,
                                 min: 0,
                                 max: 100,
                                 onChanged: (value) {
                                   setState(() {
                                     _energyLevel = value;
                                   });
+                                },
+                                onChangeStart: (value) {
+                                  if (_energyLevel == null) {
+                                    setState(() {
+                                      _energyLevel = value;
+                                    });
+                                  }
                                 },
                               ),
                             ),
@@ -333,7 +418,7 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
                       children: [
                         // Sleep quality indicator
                         Text(
-                          _sleepQualities[_sleepQualityIndex],
+                          _sleepQualityIndex != null ? _sleepQualities[_sleepQualityIndex!] : '--',
                           style: const TextStyle(
                             fontSize: 48,
                             fontWeight: FontWeight.w300,
@@ -372,15 +457,22 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
                                 valueIndicatorTextStyle: const TextStyle(color: Colors.white),
                               ),
                               child: Slider(
-                                value: _sleepQualityIndex.toDouble(),
+                                value: _sleepQualityIndex?.toDouble() ?? 0,
                                 min: 0,
                                 max: 4,
                                 divisions: 4,
-                                label: _sleepQualities[_sleepQualityIndex],
+                                label: _sleepQualityIndex != null ? _sleepQualities[_sleepQualityIndex!] : 'Select',
                                 onChanged: (value) {
                                   setState(() {
                                     _sleepQualityIndex = value.round();
                                   });
+                                },
+                                onChangeStart: (value) {
+                                  if (_sleepQualityIndex == null) {
+                                    setState(() {
+                                      _sleepQualityIndex = value.round();
+                                    });
+                                  }
                                 },
                               ),
                             ),
@@ -394,32 +486,35 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
 
               const SizedBox(height: 40),
 
-              // Input Cards
-              SizedBox(
-                height: 150,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    _buildInputCard('Nutrition', _nutrition, (value) => setState(() => _nutrition = value)),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Additional Input Cards
-              SizedBox(
-                height: 150,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    _buildInputCard('Exercise', _exercise, (value) => setState(() => _exercise = value)),
-                    const SizedBox(width: 16),
-                    _buildInputCard('Emotion', _emotion, (value) => setState(() => _emotion = value)),
-                    const SizedBox(width: 16),
-                    _buildInputCard('Symptoms', _symptoms, (value) => setState(() => _symptoms = value)),
-                  ],
-                ),
+              // Input Fields Grid
+              Column(
+                children: [
+                  // First row: Nutrition and Exercise
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildInputCard('Nutrition', _nutrition, (value) => setState(() => _nutrition = value)),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildInputCard('Exercise', _exercise, (value) => setState(() => _exercise = value)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Second row: Emotion and Symptoms
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildInputCard('Emotion', _emotion, (value) => setState(() => _emotion = value)),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildInputCard('Symptoms', _symptoms, (value) => setState(() => _symptoms = value)),
+                      ),
+                    ],
+                  ),
+                ],
               ),
 
               const SizedBox(height: 24),
@@ -497,6 +592,88 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
               ),
 
               const SizedBox(height: 24),
+
+              // Recommendations section
+              if (_isLoadingRecommendations)
+                Center(
+                  child: Column(
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Loading your personalized recommendations...',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (_recommendation != null)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Your Recommendations',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _recommendation!.poeticMessage,
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Current Phase: ${_recommendation!.currentPhase}',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        ..._recommendation!.recommendations.entries.map(
+                          (entry) => Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                entry.key.replaceAll('_', ' ').toUpperCase(),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              ...entry.value.map(
+                                (recommendation) => Padding(
+                                  padding: const EdgeInsets.only(
+                                    left: 16,
+                                    bottom: 8,
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('• '),
+                                      Expanded(
+                                        child: Text(recommendation),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -561,8 +738,8 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
     }
 
     return Container(
-      width: 200,
       padding: const EdgeInsets.all(16),
+      height: 150,
       decoration: BoxDecoration(
         color: Colors.grey[100],
         borderRadius: BorderRadius.circular(12),

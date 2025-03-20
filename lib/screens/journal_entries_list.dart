@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/journal_entry.dart';
 import '../services/journal_service.dart';
 import 'interactive_input.dart';
+import '../services/daily_log_service.dart';
 
 class JournalEntriesListScreen extends StatefulWidget {
   const JournalEntriesListScreen({super.key});
@@ -22,12 +23,26 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
   }
 
   Future<void> _addOrUpdateEntry(DateTime selectedDate, [JournalEntry? initialEntry]) async {
+    // If we're adding a new entry for today and no initial entry is provided,
+    // try to fetch today's entry first
+    JournalEntry? todayEntry;
+    if (initialEntry == null && selectedDate.year == DateTime.now().year &&
+        selectedDate.month == DateTime.now().month &&
+        selectedDate.day == DateTime.now().day) {
+      try {
+        final dailyLogService = DailyLogService(FirebaseFirestore.instance);
+        todayEntry = await dailyLogService.getTodayLog();
+      } catch (e) {
+        print('Error fetching today\'s entry: $e');
+      }
+    }
+
     final result = await Navigator.push<JournalEntry>(
       context,
       MaterialPageRoute(
         builder: (context) => InteractiveInputScreen(
           selectedDate: selectedDate,
-          initialEntry: initialEntry,
+          initialEntry: initialEntry ?? todayEntry,
         ),
       ),
     );

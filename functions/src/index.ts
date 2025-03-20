@@ -66,7 +66,7 @@ function formatDate(date: string): string {
 async function updateDailyEntry(date: string, data: any) {
   const formattedDate = formatDate(date);
   console.log('Formatting date:', date, 'to:', formattedDate);
-  const dailyRef = admin.firestore().collection('dailyEntries').doc(formattedDate);
+  const dailyRef = admin.firestore().collection('dailyLogs').doc(formattedDate);
 
   try {
     await admin.firestore().runTransaction(async (transaction) => {

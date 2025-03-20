@@ -11,6 +11,8 @@ class JournalEntry {
   final double? proteinGrams;
   final double? bodyStressLevel;
   final String notes;
+  final DateTime? lastPeriodDate;
+  final Map<String, dynamic>? recommendations;
 
   JournalEntry({
     required this.date,
@@ -25,6 +27,8 @@ class JournalEntry {
     this.proteinGrams,
     this.bodyStressLevel,
     this.notes = '',
+    this.lastPeriodDate,
+    this.recommendations,
   });
 
   // Create a copy of this JournalEntry with some fields updated
@@ -41,6 +45,8 @@ class JournalEntry {
     double? proteinGrams,
     double? bodyStressLevel,
     String? notes,
+    DateTime? lastPeriodDate,
+    Map<String, dynamic>? recommendations,
   }) {
     return JournalEntry(
       date: date ?? this.date,
@@ -55,6 +61,8 @@ class JournalEntry {
       proteinGrams: proteinGrams ?? this.proteinGrams,
       bodyStressLevel: bodyStressLevel ?? this.bodyStressLevel,
       notes: notes ?? this.notes,
+      lastPeriodDate: lastPeriodDate ?? this.lastPeriodDate,
+      recommendations: recommendations ?? this.recommendations,
     );
   }
 
@@ -73,6 +81,8 @@ class JournalEntry {
       'proteinGrams': proteinGrams,
       'bodyStressLevel': bodyStressLevel,
       'notes': notes,
+      'lastPeriodDate': lastPeriodDate?.toIso8601String(),
+      'recommendations': recommendations,
     };
   }
 
@@ -91,6 +101,8 @@ class JournalEntry {
       proteinGrams: map['proteinGrams']?.toDouble(),
       bodyStressLevel: map['bodyStressLevel']?.toDouble(),
       notes: map['notes'] ?? '',
+      lastPeriodDate: map['lastPeriodDate'] != null ? DateTime.parse(map['lastPeriodDate']) : null,
+      recommendations: map['recommendations'] as Map<String, dynamic>?,
     );
   }
 } 
