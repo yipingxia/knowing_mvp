@@ -8,6 +8,7 @@ import '../models/journal_entry.dart';
 import '../widgets/tarot_card.dart';
 import '../screens/interactive_input.dart';
 import 'journal_entries_list.dart';
+import '../services/recommendations_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -76,7 +77,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final TextEditingController _journalController = TextEditingController();
   DateTime? _lastPeriodDate;
   final OpenAIService _openAIService = OpenAIService();
-  final DailyLogService _dailyLogService = DailyLogService(FirebaseFirestore.instance);
+  final DailyLogService _dailyLogService;
+  final RecommendationsService _recommendationsService;
   bool _isLoading = false;
   bool _isEditing = true;
   Recommendation? _recommendation;
@@ -85,6 +87,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final ScrollController _pillScrollController = ScrollController();
   late AnimationController _shimmerController;
   late Map<String, List<String>> sortedRecommendations = {};
+  JournalEntry? _todayEntry;
+
+  _HomeScreenState()
+      : _dailyLogService = DailyLogService(FirebaseFirestore.instance),
+        _recommendationsService = RecommendationsService(FirebaseFirestore.instance);
 
   @override
   void initState() {
@@ -118,26 +125,81 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
     });
 
-    // Load today's log if it exists
-    _loadTodayLog();
+    // Load today's data
+    _loadTodayData();
   }
 
-  Future<void> _loadTodayLog() async {
+  Future<void> _loadTodayData() async {
     try {
-      final todayLog = await _dailyLogService.getTodayLog();
-      if (todayLog != null) {
-        setState(() {
-          _journalController.text = todayLog.notes;
-          _lastPeriodDate = todayLog.lastPeriodDate;
-          _isEditing = false;
-          if (todayLog.recommendations != null) {
-            _recommendation = Recommendation.fromJson(todayLog.recommendations!);
+      print('Starting to load today\'s data...');
+      // Load recommendations for today first
+      final today = DateTime.now();
+      print('Fetching recommendations for: ${today.toIso8601String()}');
+      
+      // Use watchRecommendations instead of getRecommendations for real-time updates
+      _recommendationsService.watchRecommendations(today).listen(
+        (recommendations) {
+          print('Recommendations loaded: ${recommendations != null ? 'yes' : 'no'}');
+          if (recommendations != null) {
+            print('Recommendations content: ${recommendations.recommendations}');
+            if (mounted) {
+              setState(() {
+                _recommendation = recommendations;
+                // Update sortedRecommendations if needed
+                if (_recommendation != null) {
+                  final cardOrder = [
+                    'symptoms_management',
+                    'exercise',
+                    'nutrition',
+                    'relationship',
+                    'emotional_wellbeing',
+                    'stress_management',
+                    'tell_partner',
+                  ];
+                  sortedRecommendations = Map.fromEntries(
+                    cardOrder.map((key) => MapEntry(
+                      key, 
+                      _recommendation!.recommendations[key] ?? [],
+                    )),
+                  );
+                }
+              });
+            }
           }
+        },
+        onError: (error) {
+          print('Error watching recommendations: $error');
+        },
+      );
+
+      // Then load today's log
+      print('Fetching today\'s log...');
+      final todayLog = await _dailyLogService.getTodayLog();
+      print('Today\'s log loaded: ${todayLog != null ? 'yes' : 'no'}');
+      if (todayLog != null) {
+        print('Log content - notes: ${todayLog.notes}, nutrition: ${todayLog.nutrition}, exercise: ${todayLog.exercise}');
+      }
+      if (todayLog != null && mounted) {
+        setState(() {
+          _lastPeriodDate = todayLog.lastPeriodDate;
+          _journalController.text = todayLog.notes;
+          _isEditing = false;  // Set to false since we have data
+          _todayEntry = todayLog;  // Store the entry
+        });
+      } else if (mounted) {
+        setState(() {
+          _isEditing = true;  // Set to true since we need input
+          _todayEntry = null;
         });
       }
-    } catch (e) {
-      print('Error loading today\'s log: $e');
-      // Don't show error to user, just leave the form empty
+    } catch (e, stackTrace) {
+      print('Error loading today\'s data: $e');
+      print('Stack trace: $stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading today\'s data: $e')),
+        );
+      }
     }
   }
 
@@ -516,100 +578,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Today's Log
-                _buildInfoCard(
-                  content: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text("Today's Log", style: titleStyle),
-                          if (!_isEditing)
-                            TextButton.icon(
-                              onPressed: () {
-                                setState(() {
-                                  _isEditing = true;
-                                });
-                              },
-                              icon: const Icon(Icons.edit, color: secondaryColor, size: 20),
-                              label: Text(
-                                'Edit',
-                                style: subtitleStyle.copyWith(color: secondaryColor),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _isEditing
-                        ? TextField(
-                            controller: _journalController,
-                            maxLines: 5,
-                            decoration: InputDecoration(
-                              hintText: 'Share your mood, symptoms, food intake, sleep quality, stress levels...',
-                              hintStyle: subtitleStyle,
-                              border: const OutlineInputBorder(
-                                borderSide: BorderSide(color: borderColor),
-                              ),
-                              enabledBorder: const OutlineInputBorder(
-                                borderSide: BorderSide(color: borderColor),
-                              ),
-                              focusedBorder: const OutlineInputBorder(
-                                borderSide: BorderSide(color: primaryColor),
-                              ),
-                            ),
-                          )
-                        : Text(_journalController.text, style: subtitleStyle),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Last Period Date
-                _buildInfoCard(
-                  title: 'Last Period Start Date',
-                  content: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      _lastPeriodDate != null
-                          ? '${_lastPeriodDate!.day}/${_lastPeriodDate!.month}/${_lastPeriodDate!.year}'
-                          : 'Not set',
-                      style: subtitleStyle,
-                    ),
-                    trailing: const Icon(Icons.calendar_today, color: secondaryColor),
-                    onTap: () async {
-                      final DateTime? picked = await showDatePicker(
-                        context: context,
-                        initialDate: _lastPeriodDate ?? DateTime.now(),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime.now(),
-                        builder: (context, child) {
-                          return Theme(
-                            data: Theme.of(context).copyWith(
-                              colorScheme: const ColorScheme.light(
-                                primary: primaryColor,
-                                onPrimary: Colors.white,
-                                surface: surfaceColor,
-                                onSurface: primaryColor,
-                              ),
-                            ),
-                            child: child!,
-                          );
-                        },
-                      );
-                      if (picked != null) {
-                        setState(() {
-                          _lastPeriodDate = picked;
-                        });
-                      }
-                    },
-                  ),
-                ),
-
-                const SizedBox(height: 16),
+                // Show either summary tile or input fields
+                if (_isEditing)
+                  _buildInputFields()
+                else
+                  _buildTodaySummaryTile(),
 
                 // Submit Button
-                if (_isEditing)
+                if (_isEditing) ...[
+                  const SizedBox(height: 16),
                   Container(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -640,6 +617,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                     ),
                   ),
+                ],
 
                 if (_recommendation != null || _isLoading) ...[
                   const SizedBox(height: 24),
@@ -689,7 +667,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                     const SizedBox(height: 32),
 
-                    // Keep the Tarot cards section colorful
                     _buildRecommendationsSection(),
                 ],
               ],
@@ -708,73 +685,274 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return;
     }
 
-    if (_journalController.text.trim().isEmpty) {
+    if (_journalController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your journal entry')),
+        const SnackBar(content: Text('Please enter some text in your journal')),
       );
       return;
     }
 
     setState(() {
       _isLoading = true;
-      _isEditing = false;  // Immediately switch to view mode
     });
 
-    // Navigate to interactive input immediately
-    if (mounted) {
-      Navigator.push(
+    try {
+      final now = DateTime.now();
+      
+      // Create initial journal entry
+      final initialEntry = JournalEntry(
+        date: now,
+        notes: _journalController.text,
+        lastPeriodDate: _lastPeriodDate,
+      );
+
+      // Save to daily logs
+      await _dailyLogService.saveLog(initialEntry);
+
+      // Start getting recommendations in the background without awaiting
+      _openAIService.getRecommendations(
+        journalEntry: _journalController.text,
+        lastPeriodDate: _lastPeriodDate!,
+      ).then((recommendationsData) {
+        // After recommendations are received, reload today's data
+        if (mounted) {
+          _loadTodayData();
+        }
+      }).catchError((e) {
+        print('Error getting recommendations: $e');
+        // Don't show error to user since this is background processing
+      });
+
+      // Navigate to interactive input screen immediately
+      if (!mounted) return;
+      final result = await Navigator.push<JournalEntry>(
         context,
         MaterialPageRoute(
           builder: (context) => InteractiveInputScreen(
-            selectedDate: DateTime.now(),
+            selectedDate: now,
+            initialEntry: initialEntry,
           ),
         ),
       );
-    }
 
-    // Get recommendations in the background
-    try {
-      final response = await _openAIService.getRecommendations(
-        journalEntry: _journalController.text,
-        lastPeriodDate: _lastPeriodDate!,
-      );
-
-      if (response.containsKey('error')) {
-        throw Exception(response['error']);
+      // Update the state with the returned entry
+      if (result != null && mounted) {
+        setState(() {
+          _todayEntry = result;
+          _isEditing = false;
+          _isLoading = false;
+        });
       }
-
-      final recommendation = Recommendation.fromJson(response);
-      
-      // Create and save a journal entry for the daily log
-      final journalEntry = JournalEntry(
-        date: DateTime.now(),
-        phase: recommendation.currentPhase,
-        energyLevel: 0,  // Not applicable for daily log
-        sleepQualityIndex: 0,  // Not applicable for daily log
-        notes: _journalController.text,
-        lastPeriodDate: _lastPeriodDate,
-        recommendations: response,
-      );
-
-      // Save to dailyLogs collection
-      await _dailyLogService.saveLog(journalEntry);
-
-      setState(() {
-        _recommendation = recommendation;
-        _isLoading = false;
-      });
     } catch (e) {
+      print('Error submitting entry: $e');
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _isEditing = true;  // Return to edit mode on error
       });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error submitting entry: $e')),
+      );
+    }
+  }
+
+  // Add this method to handle the edit button tap
+  Future<void> _handleEditTap() async {
+    if (_todayEntry == null) return;
+    
+    final result = await Navigator.push<JournalEntry>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => InteractiveInputScreen(
+          selectedDate: DateTime.now(),
+          initialEntry: _todayEntry,
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _todayEntry = result;
+        _isEditing = false;
+      });
+      // Reload today's data to get fresh recommendations
+      _loadTodayData();
+    }
+  }
+
+  // Update the summary tile to use the new edit handler
+  Widget _buildTodaySummaryTile() {
+    if (_todayEntry == null) return const SizedBox.shrink();
+    
+    return Container(
+      decoration: cardDecoration,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text("Today's Summary", style: titleStyle),
+                TextButton.icon(
+                  onPressed: _handleEditTap,
+                  icon: const Icon(Icons.edit, color: secondaryColor, size: 20),
+                  label: Text(
+                    'Edit',
+                    style: subtitleStyle.copyWith(color: secondaryColor),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_todayEntry!.notes.isNotEmpty)
+              Text(
+                _todayEntry!.notes,
+                style: subtitleStyle,
+              ),
+            if (_todayEntry!.nutrition.isNotEmpty || _todayEntry!.exercise.isNotEmpty || 
+                _todayEntry!.emotion.isNotEmpty || _todayEntry!.symptoms.isNotEmpty) ...[
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (_todayEntry!.nutrition.isNotEmpty)
+                    _buildTag('Nutrition', _todayEntry!.nutrition, entry: _todayEntry),
+                  if (_todayEntry!.exercise.isNotEmpty)
+                    _buildTag('Exercise', _todayEntry!.exercise, entry: _todayEntry),
+                  if (_todayEntry!.emotion.isNotEmpty)
+                    _buildTag('Emotion', _todayEntry!.emotion),
+                  if (_todayEntry!.symptoms.isNotEmpty)
+                    _buildTag('Symptoms', _todayEntry!.symptoms),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Add this method to build input fields
+  Widget _buildInputFields() {
+    return Column(
+      children: [
+        _buildInfoCard(
+          content: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Today's Log", style: titleStyle),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _journalController,
+                maxLines: 5,
+                decoration: InputDecoration(
+                  hintText: 'Share your mood, symptoms, food intake, sleep quality, stress levels...',
+                  hintStyle: subtitleStyle,
+                  border: const OutlineInputBorder(
+                    borderSide: BorderSide(color: borderColor),
+                  ),
+                  enabledBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: borderColor),
+                  ),
+                  focusedBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: primaryColor),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildInfoCard(
+          title: 'Last Period Start Date',
+          content: ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              _lastPeriodDate != null
+                  ? '${_lastPeriodDate!.day}/${_lastPeriodDate!.month}/${_lastPeriodDate!.year}'
+                  : 'Not set',
+              style: subtitleStyle,
+            ),
+            trailing: const Icon(Icons.calendar_today, color: secondaryColor),
+            onTap: () async {
+              final DateTime? picked = await showDatePicker(
+                context: context,
+                initialDate: _lastPeriodDate ?? DateTime.now(),
+                firstDate: DateTime(2000),
+                lastDate: DateTime.now(),
+                builder: (context, child) {
+                  return Theme(
+                    data: Theme.of(context).copyWith(
+                      colorScheme: const ColorScheme.light(
+                        primary: primaryColor,
+                        onPrimary: Colors.white,
+                        surface: surfaceColor,
+                        onSurface: primaryColor,
+                      ),
+                    ),
+                    child: child!,
+                  );
+                },
+              );
+              if (picked != null) {
+                setState(() {
+                  _lastPeriodDate = picked;
+                });
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Add the _buildTag method
+  Widget _buildTag(String label, String value, {JournalEntry? entry}) {
+    // For nutrition tag, show fiber and protein content
+    String displayValue = value;
+    if (label == 'Nutrition' && entry != null) {
+      if (entry.fiberGrams != null || entry.proteinGrams != null) {
+        displayValue = 'Fiber: ${entry.fiberGrams?.toStringAsFixed(1) ?? '0'}g, '
+                      'Protein: ${entry.proteinGrams?.toStringAsFixed(1) ?? '0'}g';
       }
     }
+    // For exercise tag, show body stress level if available
+    if (label == 'Exercise' && entry?.bodyStressLevel != null) {
+      displayValue = '$value (Stress: ${entry!.bodyStressLevel!.toStringAsFixed(1)}/10)';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Text(
+            displayValue,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
   }
 }
 

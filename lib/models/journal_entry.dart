@@ -7,28 +7,26 @@ class JournalEntry {
   final String emotion;
   final String symptoms;
   final String nutrition;
+  final String notes;
   final double? fiberGrams;
   final double? proteinGrams;
   final double? bodyStressLevel;
-  final String notes;
   final DateTime? lastPeriodDate;
-  final Map<String, dynamic>? recommendations;
 
   JournalEntry({
     required this.date,
-    required this.phase,
-    required this.energyLevel,
-    required this.sleepQualityIndex,
+    this.phase = '',
+    this.energyLevel = 0,
+    this.sleepQualityIndex = 0,
     this.exercise = '',
     this.emotion = '',
     this.symptoms = '',
     this.nutrition = '',
+    this.notes = '',
     this.fiberGrams,
     this.proteinGrams,
     this.bodyStressLevel,
-    this.notes = '',
     this.lastPeriodDate,
-    this.recommendations,
   });
 
   // Create a copy of this JournalEntry with some fields updated
@@ -41,12 +39,11 @@ class JournalEntry {
     String? emotion,
     String? symptoms,
     String? nutrition,
+    String? notes,
     double? fiberGrams,
     double? proteinGrams,
     double? bodyStressLevel,
-    String? notes,
     DateTime? lastPeriodDate,
-    Map<String, dynamic>? recommendations,
   }) {
     return JournalEntry(
       date: date ?? this.date,
@@ -57,12 +54,11 @@ class JournalEntry {
       emotion: emotion ?? this.emotion,
       symptoms: symptoms ?? this.symptoms,
       nutrition: nutrition ?? this.nutrition,
+      notes: notes ?? this.notes,
       fiberGrams: fiberGrams ?? this.fiberGrams,
       proteinGrams: proteinGrams ?? this.proteinGrams,
       bodyStressLevel: bodyStressLevel ?? this.bodyStressLevel,
-      notes: notes ?? this.notes,
       lastPeriodDate: lastPeriodDate ?? this.lastPeriodDate,
-      recommendations: recommendations ?? this.recommendations,
     );
   }
 
@@ -82,7 +78,6 @@ class JournalEntry {
       'bodyStressLevel': bodyStressLevel,
       'notes': notes,
       'lastPeriodDate': lastPeriodDate?.toIso8601String(),
-      'recommendations': recommendations,
     };
   }
 
@@ -97,12 +92,11 @@ class JournalEntry {
       emotion: map['emotion'] ?? '',
       symptoms: map['symptoms'] ?? '',
       nutrition: map['nutrition'] ?? '',
+      notes: map['notes'] ?? '',
       fiberGrams: map['fiberGrams']?.toDouble(),
       proteinGrams: map['proteinGrams']?.toDouble(),
       bodyStressLevel: map['bodyStressLevel']?.toDouble(),
-      notes: map['notes'] ?? '',
       lastPeriodDate: map['lastPeriodDate'] != null ? DateTime.parse(map['lastPeriodDate']) : null,
-      recommendations: map['recommendations'] as Map<String, dynamic>?,
     );
   }
 } 

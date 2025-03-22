@@ -42,23 +42,32 @@ function formatDate(date: string): string {
     if (date.includes('T')) {
       // If date is in ISO format
       dateObj = new Date(date);
+    } else if (date.includes(' ')) {
+      // If date has timestamp (e.g., "2025-03-22 14:38:19.013")
+      dateObj = new Date(date.split(' ')[0]);
     } else if (date.includes('-')) {
       // If date is already in YYYY-MM-DD format
       return date;
     } else {
-      // If date is in a different format (e.g., "YYYY-MM-DD HH:mm:ss.SSS")
-      dateObj = new Date(date.split(' ')[0]);
+      dateObj = new Date(date);
     }
 
     if (isNaN(dateObj.getTime())) {
       throw new Error('Invalid date');
     }
 
-    return dateObj.toISOString().split('T')[0];
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   } catch (error) {
     console.error('Error formatting date:', error);
     // Return today's date as fallback
-    return new Date().toISOString().split('T')[0];
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 }
 
@@ -91,6 +100,47 @@ async function updateDailyEntry(date: string, data: any) {
     console.log('Successfully updated daily entry for:', formattedDate);
   } catch (error) {
     console.error('Error updating daily entry:', error);
+    // Don't throw error, just log it
+  }
+}
+
+// Helper function to update or create daily recommendations
+async function updateDailyRecommendations(date: string, data: any) {
+  // Format date to YYYY-MM-DD only, handling both ISO strings and timestamp formats
+  const formattedDate = formatDate(date);
+  console.log('Formatting date:', date, 'to:', formattedDate);
+  
+  // Get existing document if it exists
+  const recoRef = admin.firestore().collection('dailyRecos').doc(formattedDate);
+  
+  try {
+    await admin.firestore().runTransaction(async (transaction) => {
+      const doc = await transaction.get(recoRef);
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      
+      // Extract the recommendations data if it's nested
+      const recommendationsData = data.recommendations || data;
+      
+      if (!doc.exists) {
+        // For new documents, set initial data
+        transaction.set(recoRef, {
+          ...recommendationsData,
+          date: formattedDate, // Store the formatted date
+          createdAt: now,
+          updatedAt: now
+        });
+      } else {
+        // For existing documents, merge with existing data
+        transaction.update(recoRef, {
+          ...recommendationsData,
+          date: formattedDate, // Ensure date is in correct format
+          updatedAt: now
+        });
+      }
+    });
+    console.log('Successfully updated daily recommendations for:', formattedDate);
+  } catch (error) {
+    console.error('Error updating daily recommendations:', error);
     // Don't throw error, just log it
   }
 }
@@ -359,14 +409,17 @@ IMPORTANT: Your response must follow this exact structure as a valid JSON object
         console.log('Invalid phase detected:', parsedContent.current_phase);
       }
       
-      // Store recommendations
+      // Store recommendations in dailyRecos collection
+      await updateDailyRecommendations(date, {
+        ...parsedContent,
+        journalEntry: data.journalEntry,
+        userId: context.auth?.uid || 'anonymous',
+        lastPeriodDate: data.lastPeriodDate
+      });
+
+      // Also update phase in dailyLogs
       await updateDailyEntry(date, {
-        recommendations: {
-          ...parsedContent,
-          journalEntry: data.journalEntry,
-          userId: context.auth?.uid || 'anonymous',
-          lastPeriodDate: data.lastPeriodDate
-        }
+        phase: parsedContent.current_phase
       });
 
       return parsedContent;

@@ -127,6 +127,10 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
                 }
               }
             }
+          } else {
+            // If we have an initial entry, use its notes
+            _notes = widget.initialEntry!.notes;
+            _notesController.text = _notes;
           }
         });
       }
@@ -193,7 +197,10 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
         emotion: _emotion,
         symptoms: _symptoms,
         nutrition: _nutrition,
-        notes: _notes,
+        // Only use the new notes if they were explicitly changed
+        notes: _notesController.text == widget.initialEntry?.notes ? 
+               widget.initialEntry!.notes : 
+               _notes,
       );
 
       JournalEntry updatedEntry = entry;
@@ -237,23 +244,25 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
         }
       }
 
-      // Compile notes from all fields
-      final compiledNotes = [
-        if (_nutrition.isNotEmpty) 'Nutrition: $_nutrition',
-        if (_exercise.isNotEmpty) 'Exercise: $_exercise',
-        if (_emotion.isNotEmpty) 'Emotion: $_emotion',
-        if (_symptoms.isNotEmpty) 'Symptoms: $_symptoms',
-        if (_notes.isNotEmpty) '\nAdditional Notes:\n$_notes',
-      ].join('\n');
-
-      // Update the daily log with the compiled notes
+      // Create the daily log entry with the original notes preserved
       final dailyLogEntry = JournalEntry(
         date: widget.selectedDate,
         phase: _phase,
         energyLevel: _energyLevel ?? 0,
         sleepQualityIndex: _sleepQualityIndex ?? 0,
-        notes: compiledNotes,
+        notes: _notesController.text == widget.initialEntry?.notes ? 
+               widget.initialEntry!.notes : 
+               _notes,
+        exercise: _exercise,
+        emotion: _emotion,
+        symptoms: _symptoms,
+        nutrition: _nutrition,
+        fiberGrams: updatedEntry.fiberGrams,
+        proteinGrams: updatedEntry.proteinGrams,
+        bodyStressLevel: updatedEntry.bodyStressLevel,
       );
+
+      // Save to daily logs
       await _dailyLogService.saveLog(dailyLogEntry);
       
       // Return the entry with any successful analyses

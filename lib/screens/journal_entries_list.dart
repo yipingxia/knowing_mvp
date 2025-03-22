@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/journal_entry.dart';
-import '../services/journal_service.dart';
-import 'interactive_input.dart';
 import '../services/daily_log_service.dart';
+import 'interactive_input.dart';
 
 class JournalEntriesListScreen extends StatefulWidget {
   const JournalEntriesListScreen({super.key});
@@ -14,12 +13,12 @@ class JournalEntriesListScreen extends StatefulWidget {
 }
 
 class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
-  late final JournalService _journalService;
+  late final DailyLogService _dailyLogService;
   
   @override
   void initState() {
     super.initState();
-    _journalService = JournalService(FirebaseFirestore.instance);
+    _dailyLogService = DailyLogService(FirebaseFirestore.instance);
   }
 
   Future<void> _addOrUpdateEntry(DateTime selectedDate, [JournalEntry? initialEntry]) async {
@@ -30,8 +29,7 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
         selectedDate.month == DateTime.now().month &&
         selectedDate.day == DateTime.now().day) {
       try {
-        final dailyLogService = DailyLogService(FirebaseFirestore.instance);
-        todayEntry = await dailyLogService.getTodayLog();
+        todayEntry = await _dailyLogService.getTodayLog();
       } catch (e) {
         print('Error fetching today\'s entry: $e');
       }
@@ -48,7 +46,7 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
     );
 
     if (result != null) {
-      await _journalService.saveEntry(result);
+      await _dailyLogService.saveLog(result);
     }
   }
 
@@ -69,7 +67,7 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
         centerTitle: true,
       ),
       body: StreamBuilder<List<JournalEntry>>(
-        stream: _journalService.getAllEntries(),
+        stream: _dailyLogService.getAllLogs(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));

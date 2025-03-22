@@ -7,6 +7,11 @@ class OpenAIService {
     region: 'asia-southeast1',
   );
 
+  // Helper function to format date as YYYY-MM-DD
+  String _formatDate(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
   Future<Map<String, dynamic>> getRecommendations({
     required String journalEntry,
     required DateTime lastPeriodDate,
@@ -23,8 +28,8 @@ class OpenAIService {
       print('Making function call...');
       final result = await functions.httpsCallable('getRecommendations').call({
         'journalEntry': journalEntry,
-        'lastPeriodDate': lastPeriodDate.toString(),
-        'currentDate': DateTime.now().toString(),
+        'lastPeriodDate': _formatDate(lastPeriodDate),
+        'currentDate': _formatDate(DateTime.now()),
         'systemPrompt': '''
         You are a menstrual health expert. Analyze the user's journal entry and calculate their current menstrual phase based on their last period start date.
 

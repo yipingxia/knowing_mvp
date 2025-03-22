@@ -16,28 +16,43 @@ class DailyLogService {
     try {
       print('Attempting to save daily log for date: ${entry.date}');
       
+      // Format date as YYYY-MM-DD
       final String documentId = entry.date.toIso8601String().split('T')[0];
       print('Using document ID: $documentId');
       
-      final Map<String, dynamic> logData = {
-        'date': Timestamp.fromDate(entry.date),
-        'phase': entry.phase,
-        'energyLevel': entry.energyLevel,
-        'sleepQualityIndex': entry.sleepQualityIndex,
-        'exercise': entry.exercise,
-        'emotion': entry.emotion,
-        'symptoms': entry.symptoms,
-        'nutrition': entry.nutrition,
-        'notes': entry.notes,
-        'lastPeriodDate': entry.lastPeriodDate?.toIso8601String(),
-        'recommendations': entry.recommendations,
-        'fiberGrams': entry.fiberGrams,
-        'proteinGrams': entry.proteinGrams,
-        'bodyStressLevel': entry.bodyStressLevel,
+      // Get existing document to merge correctly
+      final existingDoc = await _logsCollection.doc(documentId).get();
+      final existingData = existingDoc.data() ?? {};
+      
+      // Create update data based on what fields are provided
+      final Map<String, dynamic> updateData = {
+        'date': documentId,  // Store as string YYYY-MM-DD
         'lastUpdated': FieldValue.serverTimestamp(),
       };
 
-      await _logsCollection.doc(documentId).set(logData, SetOptions(merge: true));
+      // Update fields from InteractiveInputScreen if they are provided
+      if (entry.emotion.isNotEmpty) updateData['emotion'] = entry.emotion;
+      if (entry.energyLevel > 0) updateData['energyLevel'] = entry.energyLevel;
+      if (entry.exercise.isNotEmpty) updateData['exercise'] = entry.exercise;
+      if (entry.bodyStressLevel != null) updateData['bodyStressLevel'] = entry.bodyStressLevel;
+      if (entry.nutrition.isNotEmpty) updateData['nutrition'] = entry.nutrition;
+      if (entry.fiberGrams != null) updateData['fiberGrams'] = entry.fiberGrams;
+      if (entry.proteinGrams != null) updateData['proteinGrams'] = entry.proteinGrams;
+      if (entry.sleepQualityIndex > 0) updateData['sleepQuality'] = entry.sleepQualityIndex;
+      if (entry.symptoms.isNotEmpty) updateData['symptoms'] = entry.symptoms;
+      
+      // Update fields from HomeScreen if they are provided
+      if (entry.lastPeriodDate != null) {
+        updateData['lastPeriodDate'] = entry.lastPeriodDate?.toIso8601String();
+      }
+      if (entry.notes.isNotEmpty) updateData['notes'] = entry.notes;
+
+      // Keep existing phase if it exists
+      if (existingData['currentPhase'] != null) {
+        updateData['currentPhase'] = existingData['currentPhase'];
+      }
+
+      await _logsCollection.doc(documentId).set(updateData, SetOptions(merge: true));
       print('Successfully saved daily log to Firestore with ID: $documentId');
     } catch (e, stackTrace) {
       print('Error saving daily log: $e');
@@ -83,36 +98,28 @@ class DailyLogService {
 
   // Convert Firestore data to JournalEntry object
   JournalEntry _convertToJournalEntry(Map<String, dynamic> data) {
-    final date = data['date'] is Timestamp 
-        ? (data['date'] as Timestamp).toDate()
-        : DateTime.parse(data['date'].toString());
+    // Parse date from string YYYY-MM-DD
+    final date = DateTime.parse(data['date']);
     
+    // Parse lastPeriodDate if it exists
     final lastPeriodDate = data['lastPeriodDate'] != null
-        ? DateTime.parse(data['lastPeriodDate'].toString())
+        ? DateTime.parse(data['lastPeriodDate'])
         : null;
 
-    // Get fields directly from the document data
-    final exercise = data['exercise'] as String? ?? '';
-    final emotion = data['emotion'] as String? ?? '';
-    final symptoms = data['symptoms'] as String? ?? '';
-    final nutrition = data['nutrition'] as String? ?? '';
-    final notes = data['notes'] as String? ?? '';
-        
     return JournalEntry(
       date: date,
-      phase: data['phase'] ?? '',
+      phase: data['currentPhase'] ?? '',
       energyLevel: (data['energyLevel'] as num?)?.toDouble() ?? 0,
-      sleepQualityIndex: (data['sleepQualityIndex'] as num?)?.toInt() ?? 0,
-      exercise: exercise,
-      emotion: emotion,
-      symptoms: symptoms,
-      nutrition: nutrition,
-      notes: notes,
-      fiberGrams: data['fiberGrams'] as double?,
-      proteinGrams: data['proteinGrams'] as double?,
-      bodyStressLevel: data['bodyStressLevel'] as double?,
+      sleepQualityIndex: (data['sleepQuality'] as num?)?.toInt() ?? 0,
+      exercise: data['exercise'] as String? ?? '',
+      emotion: data['emotion'] as String? ?? '',
+      symptoms: data['symptoms'] as String? ?? '',
+      nutrition: data['nutrition'] as String? ?? '',
+      notes: data['notes'] as String? ?? '',
+      fiberGrams: (data['fiberGrams'] as num?)?.toDouble(),
+      proteinGrams: (data['proteinGrams'] as num?)?.toDouble(),
+      bodyStressLevel: (data['bodyStressLevel'] as num?)?.toDouble(),
       lastPeriodDate: lastPeriodDate,
-      recommendations: data['recommendations'] as Map<String, dynamic>?,
     );
   }
 } 
