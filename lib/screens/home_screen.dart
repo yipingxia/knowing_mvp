@@ -440,9 +440,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     horizontal: 16.0,
                     vertical: 24.0,
                   ),
-                  child: TarotCard(
-                    title: entry.key.replaceAll('_', ' '),
-                    recommendations: entry.value,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 720),
+                    child: TarotCard(
+                      title: entry.key.replaceAll('_', ' '),
+                      recommendations: entry.value,
+                    ),
                   ),
                 );
               }).toList(),
@@ -778,11 +781,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
       // Update the state with the returned entry
       if (result != null && mounted) {
-        setState(() {
+      setState(() {
           _todayEntry = result;
           _isEditing = false;
-          _isLoading = false;
-        });
+        _isLoading = false;
+      });
       }
     } catch (e) {
       print('Error submitting entry: $e');
@@ -801,14 +804,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (_todayEntry == null) return;
     
     final result = await Navigator.push<JournalEntry>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => InteractiveInputScreen(
-          selectedDate: DateTime.now(),
+          context,
+          MaterialPageRoute(
+            builder: (context) => InteractiveInputScreen(
+              selectedDate: DateTime.now(),
           initialEntry: _todayEntry,
-        ),
-      ),
-    );
+            ),
+          ),
+        );
 
     if (result != null && mounted) {
       setState(() {
@@ -853,18 +856,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ],
             ),
             const SizedBox(height: 16),
-            if (_todayEntry!.notes.isNotEmpty)
+            if (_todayEntry!.notes.isNotEmpty) ...[
               Text(
                 _todayEntry!.notes,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[800],
+                ),
               ),
-            if (_todayEntry!.nutrition.isNotEmpty || _todayEntry!.exercise.isNotEmpty || 
-                _todayEntry!.emotion.isNotEmpty || _todayEntry!.symptoms.isNotEmpty) ...[
+              const SizedBox(height: 16),
+            ],
+            if (_todayEntry!.energyLevel > 0 || _todayEntry!.sleepQualityIndex > 0 || 
+                _todayEntry!.nutrition.isNotEmpty || _todayEntry!.exercise.isNotEmpty || 
+                _todayEntry!.emotion.isNotEmpty || _todayEntry!.symptoms.isNotEmpty ||
+                _todayEntry!.stressors.isNotEmpty) ...[
               const Divider(height: 1),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
+                  if (_todayEntry!.energyLevel > 0)
+                    _buildTag('Energy', '${_todayEntry!.energyLevel.round()}%'),
+                  if (_todayEntry!.sleepQualityIndex > 0)
+                    _buildTag('Sleep', _getSleepQualityText(_todayEntry!.sleepQualityIndex)),
                   if (_todayEntry!.nutrition.isNotEmpty)
                     _buildTag('Nutrition', _todayEntry!.nutrition, entry: _todayEntry),
                   if (_todayEntry!.exercise.isNotEmpty)
@@ -873,6 +888,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     _buildTag('Emotion', _todayEntry!.emotion),
                   if (_todayEntry!.symptoms.isNotEmpty)
                     _buildTag('Symptoms', _todayEntry!.symptoms),
+                  if (_todayEntry!.stressors.isNotEmpty)
+                    _buildTag('Stressors', '${_todayEntry!.stressors.length} selected'),
                 ],
               ),
             ],
@@ -880,6 +897,37 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ),
       ),
     );
+  }
+
+  Widget _buildStatItem(String label, String value) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w300,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getSleepQualityText(int index) {
+    final qualities = ['Poor', 'Barely', 'Fair', 'Good', 'Great'];
+    return qualities[index];
   }
   
   // Add this method to build input fields

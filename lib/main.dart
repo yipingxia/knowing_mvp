@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
+import 'screens/splash_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -8,6 +9,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   try {
+    print('Starting Firebase initialization...');
+    
     // Initialize Firebase
     await Firebase.initializeApp(
       options: const FirebaseOptions(
@@ -20,35 +23,69 @@ void main() async {
         measurementId: "G-B2DPWC59MJ",
       ),
     );
-
-    // Connect to Firestore emulator
-    String host = kIsWeb ? 'localhost' : '10.0.2.2';
-    FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
+    print('Firebase core initialized');
 
     // Configure Firestore settings
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
       cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-      sslEnabled: false,  // Disable SSL for emulator
     );
+    print('Firestore settings configured');
 
-    // Then try to enable persistence
-    if (kIsWeb) {
+    // Wait a moment for connection to establish
+    await Future.delayed(const Duration(seconds: 2));
+
+    // Test Firestore connection with retries
+    bool connected = false;
+    int retries = 3;
+    
+    while (!connected && retries > 0) {
       try {
-        await FirebaseFirestore.instance.enablePersistence(
-          const PersistenceSettings(synchronizeTabs: true),
-        );
+        // Try to get documents with server-side validation
+        final result = await FirebaseFirestore.instance
+            .collection('usernames')
+            .limit(1)
+            .get(const GetOptions(source: Source.server));
+        print('Firestore server connection successful. Documents found: ${result.docs.length}');
+        connected = true;
       } catch (e) {
-        print('Persistence already enabled or not supported: $e');
+        retries--;
+        if (e is FirebaseException && e.code == 'unavailable') {
+          print('Server unavailable, checking cache...');
+          try {
+            final cacheResult = await FirebaseFirestore.instance
+                .collection('usernames')
+                .limit(1)
+                .get(const GetOptions(source: Source.cache));
+            print('Cache access successful. Documents in cache: ${cacheResult.docs.length}');
+            connected = true;
+          } catch (cacheError) {
+            print('Cache access failed: $cacheError');
+          }
+        } else {
+          print('Firestore connection attempt failed ($retries retries left): $e');
+        }
       }
     }
 
-    // Explicitly enable network
-    await FirebaseFirestore.instance.enableNetwork();
+    // Set up connection state monitoring
+    FirebaseFirestore.instance.snapshotsInSync().listen(
+      (_) {
+        print('Firestore is in sync with server');
+      },
+      onError: (error) {
+        print('Firestore sync error: $error');
+        if (error is FirebaseException) {
+          print('Firebase error code: ${error.code}');
+          print('Firebase error message: ${error.message}');
+        }
+      },
+    );
 
-    print('Firebase initialized successfully with emulator');
-  } catch (e) {
+    print('Firebase initialization completed. Connection state: ${connected ? "ONLINE" : "OFFLINE"}');
+  } catch (e, stackTrace) {
     print('Error initializing Firebase: $e');
+    print('Stack trace: $stackTrace');
   }
   
   runApp(const MyApp());
@@ -65,7 +102,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: const LoginScreen(),
+      home: const SplashScreen(),
     );
   }
 }

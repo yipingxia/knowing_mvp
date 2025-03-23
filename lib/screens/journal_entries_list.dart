@@ -94,18 +94,23 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
             );
           }
 
-          return GridView.builder(
-            padding: const EdgeInsets.all(24),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.85,
-            ),
-            itemCount: entries.length,
-            itemBuilder: (context, index) {
-              final entry = entries[index];
-              return _buildEntryTile(context, entry);
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final isWideScreen = constraints.maxWidth > 600;
+              return GridView.builder(
+                padding: const EdgeInsets.all(24),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: isWideScreen ? 2 : 1,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: isWideScreen ? 0.85 : 0.7,
+                ),
+                itemCount: entries.length,
+                itemBuilder: (context, index) {
+                  final entry = entries[index];
+                  return _buildEntryTile(context, entry);
+                },
+              );
             },
           );
         },

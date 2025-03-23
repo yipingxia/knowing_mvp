@@ -21,7 +21,7 @@ class UserService {
       final doc = await _firestore
           .collection('users')
           .doc(username)
-          .get(const GetOptions(source: Source.server));
+          .get(const GetOptions(source: Source.serverAndCache));
       
       if (!doc.exists) {
         print('User does not exist');
@@ -39,6 +39,10 @@ class UserService {
       return false;
     } catch (e) {
       print('Error verifying user: $e');
+      if (e is FirebaseException) {
+        print('Firebase error code: ${e.code}');
+        print('Firebase error message: ${e.message}');
+      }
       return false;
     }
   }
@@ -48,42 +52,71 @@ class UserService {
     print('Starting username registration for: $username');
     
     try {
-      // Use a transaction to ensure atomicity
-      bool success = await _firestore.runTransaction<bool>((transaction) async {
-        final usernameDoc = await transaction.get(_firestore.collection('usernames').doc(username));
-        
-        if (usernameDoc.exists) {
-          print('Username is already taken (transaction check): $username');
-          return false;
-        }
-
-        print('Username is available, creating documents');
-
-        final hashedPassword = _hashPassword(password);
-        final timestamp = FieldValue.serverTimestamp();
-
-        transaction.set(_firestore.collection('usernames').doc(username), {
-          'username': username,
-          'createdAt': timestamp,
-        });
-
-        transaction.set(_firestore.collection('users').doc(username), {
-          'username': username,
-          'password': hashedPassword,
-          'createdAt': timestamp,
-        });
-
-        return true;
-      });
-
-      if (success) {
-        saveUsernameToStorage(username);
-        print('Username registration successful');
+      // First check if username exists, try server first then cache
+      DocumentSnapshot? usernameDoc;
+      try {
+        usernameDoc = await _firestore
+            .collection('usernames')
+            .doc(username)
+            .get(const GetOptions(source: Source.server));
+      } catch (e) {
+        print('Server check failed, trying cache: $e');
+        usernameDoc = await _firestore
+            .collection('usernames')
+            .doc(username)
+            .get(const GetOptions(source: Source.cache));
+      }
+      
+      if (usernameDoc.exists) {
+        print('Username is already taken: $username');
+        return false;
       }
 
-      return success;
+      print('Username is available, creating documents');
+
+      final hashedPassword = _hashPassword(password);
+      final timestamp = FieldValue.serverTimestamp();
+      final batch = _firestore.batch();
+
+      // Prepare both documents in a batch
+      final usernameRef = _firestore.collection('usernames').doc(username);
+      final userRef = _firestore.collection('users').doc(username);
+
+      batch.set(usernameRef, {
+        'username': username,
+        'createdAt': timestamp,
+      });
+
+      batch.set(userRef, {
+        'username': username,
+        'password': hashedPassword,
+        'createdAt': timestamp,
+      });
+
+      // Commit the batch
+      await batch.commit();
+      
+      saveUsernameToStorage(username);
+      print('Username registration successful');
+      return true;
     } catch (e) {
       print('Error registering username: $e');
+      if (e is FirebaseException) {
+        print('Firebase error code: ${e.code}');
+        print('Firebase error message: ${e.message}');
+        print('Firebase error details: ${e.plugin}');
+        
+        // If offline, store registration data locally
+        if (e.code == 'unavailable') {
+          try {
+            saveUsernameToStorage(username);
+            print('Username saved locally, will sync when online');
+            return true;
+          } catch (storageError) {
+            print('Error saving to local storage: $storageError');
+          }
+        }
+      }
       return false;
     }
   }
@@ -132,6 +165,10 @@ class UserService {
       return doc.data();
     } catch (e) {
       print('Error getting user data: $e');
+      if (e is FirebaseException) {
+        print('Firebase error code: ${e.code}');
+        print('Firebase error message: ${e.message}');
+      }
       return null;
     }
   }
