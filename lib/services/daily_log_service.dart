@@ -1,21 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/journal_entry.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../services/user_service.dart';
 
 class DailyLogService {
   final FirebaseFirestore _firestore;
-  final FirebaseAuth _auth;
+  final UserService _userService;
   
   // Constructor that takes the Firestore instance
-  DailyLogService(this._firestore) : _auth = FirebaseAuth.instance;
+  DailyLogService(this._firestore) : _userService = UserService();
   
   // Get the user's daily logs collection reference
-  CollectionReference<Map<String, dynamic>> get _dailyLogsRef {
-    final userId = _auth.currentUser?.uid;
-    if (userId == null) {
+  Future<CollectionReference<Map<String, dynamic>>> get _dailyLogsRef async {
+    final username = _userService.getUsernameFromStorage();
+    if (username == null) {
       throw Exception('User not authenticated');
     }
-    return _firestore.collection('users').doc(userId).collection('dailyLogs');
+    return _firestore.collection('users').doc(username).collection('dailyLogs');
   }
 
   // Add or update a daily log
@@ -27,8 +27,10 @@ class DailyLogService {
       final String documentId = _formatDate(entry.date);
       print('Using document ID: $documentId');
       
+      final logsRef = await _dailyLogsRef;
+      
       // Get existing document to merge correctly
-      final existingDoc = await _dailyLogsRef.doc(documentId).get();
+      final existingDoc = await logsRef.doc(documentId).get();
       final existingData = existingDoc.data() ?? {};
       
       // Create update data based on what fields are provided
@@ -60,7 +62,7 @@ class DailyLogService {
         updateData['currentPhase'] = existingData['currentPhase'];
       }
 
-      await _dailyLogsRef.doc(documentId).set(updateData, SetOptions(merge: true));
+      await logsRef.doc(documentId).set(updateData, SetOptions(merge: true));
       print('Successfully saved daily log to Firestore with ID: $documentId');
     } catch (e, stackTrace) {
       print('Error saving daily log: $e');
@@ -75,7 +77,8 @@ class DailyLogService {
       final docId = _formatDate(DateTime.now());
       print('Fetching today\'s log with ID: $docId');
       
-      final doc = await _dailyLogsRef.doc(docId).get();
+      final logsRef = await _dailyLogsRef;
+      final doc = await logsRef.doc(docId).get();
       
       if (doc.exists && doc.data() != null) {
         print('Found today\'s log');
@@ -93,15 +96,17 @@ class DailyLogService {
   // Get all daily logs
   Stream<List<JournalEntry>> getAllLogs() {
     print('Setting up stream to listen for daily logs');
-    return _dailyLogsRef
-        .orderBy('date', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          print('Received ${snapshot.docs.length} logs from Firestore');
-          return snapshot.docs
-              .map((doc) => JournalEntry.fromMap(doc.data()))
-              .toList();
-        });
+    return Stream.fromFuture(_dailyLogsRef).asyncExpand((logsRef) {
+      return logsRef
+          .orderBy('date', descending: true)
+          .snapshots()
+          .map((snapshot) {
+            print('Received ${snapshot.docs.length} logs from Firestore');
+            return snapshot.docs
+                .map((doc) => JournalEntry.fromMap(doc.data()))
+                .toList();
+          });
+    });
   }
 
   String _formatDate(DateTime date) {

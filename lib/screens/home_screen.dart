@@ -9,9 +9,16 @@ import '../widgets/tarot_card.dart';
 import '../screens/interactive_input.dart';
 import 'journal_entries_list.dart';
 import '../services/recommendations_service.dart';
+import '../services/user_service.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final String username;
+
+  const HomeScreen({
+    super.key, 
+    required this.username,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -88,6 +95,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late AnimationController _shimmerController;
   late Map<String, List<String>> sortedRecommendations = {};
   JournalEntry? _todayEntry;
+  late final UserService _userService;
 
   _HomeScreenState()
       : _dailyLogService = DailyLogService(FirebaseFirestore.instance),
@@ -96,6 +104,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _userService = UserService();
     _tabController = TabController(length: 7, vsync: this);
     _shimmerController = AnimationController.unbounded(vsync: this)
       ..repeat(min: -0.5, max: 1.5, period: const Duration(milliseconds: 1000));
@@ -141,7 +150,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         (recommendations) {
           print('Recommendations loaded: ${recommendations != null ? 'yes' : 'no'}');
           if (recommendations != null) {
-            print('Recommendations content: ${recommendations.recommendations}');
+            print('Raw recommendations data: ${recommendations.toMap()}');
+            print('Current phase: ${recommendations.currentPhase}');
+            print('Poetic message: ${recommendations.poeticMessage}');
+            print('Recommendations map: ${recommendations.recommendations}');
             if (mounted) {
               setState(() {
                 _recommendation = recommendations;
@@ -156,12 +168,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     'symptoms_management',
                     'tell_partner',
                   ];
+                  print('Updating sorted recommendations with card order: $cardOrder');
                   sortedRecommendations = Map.fromEntries(
-                    cardOrder.map((key) => MapEntry(
-                      key, 
-                      _recommendation!.recommendations[key] ?? [],
-                    )),
+                    cardOrder.map((key) {
+                      final value = _recommendation!.recommendations[key] ?? [];
+                      print('Category $key has ${value.length} recommendations');
+                      return MapEntry(key, value);
+                    }),
                   );
+                  print('Final sorted recommendations: $sortedRecommendations');
                 }
               });
             }
@@ -713,10 +728,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _openAIService.getRecommendations(
         journalEntry: _journalController.text,
         lastPeriodDate: _lastPeriodDate!,
-      ).then((recommendationsData) {
-        // After recommendations are received, reload today's data
-        if (mounted) {
-          _loadTodayData();
+      ).then((recommendationsData) async {
+        try {
+          print('Received recommendations data: $recommendationsData');
+          
+          // Create a Recommendation object from the OpenAI response
+          final recommendation = Recommendation(
+            date: now,
+            currentPhase: recommendationsData['current_phase'] ?? 'Unknown',
+            daysSinceLastPeriod: recommendationsData['days_since_last_period'] ?? now.difference(_lastPeriodDate!).inDays,
+            keywords: (recommendationsData['keywords'] as List<dynamic>?)?.cast<String>() ?? ['health', 'wellness'],
+            poeticMessage: recommendationsData['poetic_message'] ?? '',
+            recommendations: Map<String, List<String>>.from(
+              (recommendationsData['recommendations'] as Map<String, dynamic>? ?? {}).map(
+                (key, value) => MapEntry(key, (value as List<dynamic>).cast<String>())
+              )
+            ),
+          );
+          
+          print('Saving recommendation: ${recommendation.toMap()}');
+          
+          // Save the recommendation to Firestore
+          await _recommendationsService.saveRecommendation(recommendation);
+          
+          // After recommendations are saved, reload today's data
+          if (mounted) {
+            _loadTodayData();
+          }
+        } catch (e, stackTrace) {
+          print('Error saving recommendations: $e');
+          print('Stack trace: $stackTrace');
         }
       }).catchError((e) {
         print('Error getting recommendations: $e');
@@ -958,6 +999,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ],
       ),
+    );
+  }
+
+  void _handleLogout(BuildContext context) {
+    _userService.clearUsernameFromStorage();
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
     );
   }
 }

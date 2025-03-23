@@ -64,6 +64,16 @@ class AuthService {
     }
   }
 
+  // Sign in with Google Web
+  Future<UserCredential> signInWithGoogleWeb(String idToken) async {
+    try {
+      final credential = GoogleAuthProvider.credential(idToken: idToken);
+      return await _auth.signInWithCredential(credential);
+    } catch (e) {
+      throw Exception('Failed to sign in with Google: $e');
+    }
+  }
+
   // Sign out
   Future<void> signOut() async {
     try {

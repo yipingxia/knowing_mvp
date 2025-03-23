@@ -72,7 +72,7 @@ class JournalEntry {
       'date': date.toIso8601String(),
       'phase': phase,
       'energyLevel': energyLevel,
-      'sleepQualityIndex': sleepQualityIndex,
+      'sleepQuality': sleepQualityIndex,
       'exercise': exercise,
       'emotion': emotion,
       'symptoms': symptoms,
@@ -88,20 +88,26 @@ class JournalEntry {
 
   // Create from Map for retrieval
   factory JournalEntry.fromMap(Map<String, dynamic> map) {
+    // Handle the date field specially since it's required
+    final dateStr = map['date'];
+    if (dateStr == null) {
+      throw FormatException('Missing required date field');
+    }
+
     return JournalEntry(
-      date: DateTime.parse(map['date']),
-      phase: map['phase'],
-      energyLevel: map['energyLevel'],
-      sleepQualityIndex: map['sleepQualityIndex'],
-      exercise: map['exercise'] ?? '',
-      emotion: map['emotion'] ?? '',
-      symptoms: map['symptoms'] ?? '',
-      nutrition: map['nutrition'] ?? '',
-      notes: map['notes'] ?? '',
-      fiberGrams: map['fiberGrams']?.toDouble(),
-      proteinGrams: map['proteinGrams']?.toDouble(),
-      bodyStressLevel: map['bodyStressLevel']?.toDouble(),
-      lastPeriodDate: map['lastPeriodDate'] != null ? DateTime.parse(map['lastPeriodDate']) : null,
+      date: DateTime.parse(dateStr),
+      phase: map['phase'] as String? ?? '',
+      energyLevel: (map['energyLevel'] as num?)?.toDouble() ?? 0.0,
+      sleepQualityIndex: (map['sleepQuality'] as num?)?.toInt() ?? 0,
+      exercise: map['exercise'] as String? ?? '',
+      emotion: map['emotion'] as String? ?? '',
+      symptoms: map['symptoms'] as String? ?? '',
+      nutrition: map['nutrition'] as String? ?? '',
+      notes: map['notes'] as String? ?? '',
+      fiberGrams: (map['fiberGrams'] as num?)?.toDouble(),
+      proteinGrams: (map['proteinGrams'] as num?)?.toDouble(),
+      bodyStressLevel: (map['bodyStressLevel'] as num?)?.toDouble(),
+      lastPeriodDate: map['lastPeriodDate'] != null ? DateTime.parse(map['lastPeriodDate'] as String) : null,
       stressors: List<String>.from(map['stressors'] ?? []),
     );
   }

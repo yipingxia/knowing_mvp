@@ -1,24 +1,55 @@
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Firebase with options
-  await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: "AIzaSyCL8C6_q3CtPkg33xXA4SUxmDOSnW-dOH4",
-      authDomain: "knowing-v1.firebaseapp.com",
-      projectId: "knowing-v1",
-      storageBucket: "knowing-v1.firebasestorage.app",
-      messagingSenderId: "349439956510",
-      appId: "1:349439956510:web:158dcfc3b5aad153f2c00f",
-      measurementId: "G-B2DPWC59MJ",
-    ),
-  );
+  try {
+    // Initialize Firebase
+    await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: "AIzaSyCL8C6_q3CtPkg33xXA4SUxmDOSnW-dOH4",
+        authDomain: "knowing-v1.firebaseapp.com",
+        projectId: "knowing-v1",
+        storageBucket: "knowing-v1.firebasestorage.app",
+        messagingSenderId: "349439956510",
+        appId: "1:349439956510:web:158dcfc3b5aad153f2c00f",
+        measurementId: "G-B2DPWC59MJ",
+      ),
+    );
+
+    // Connect to Firestore emulator
+    String host = kIsWeb ? 'localhost' : '10.0.2.2';
+    FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
+
+    // Configure Firestore settings
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+      sslEnabled: false,  // Disable SSL for emulator
+    );
+
+    // Then try to enable persistence
+    if (kIsWeb) {
+      try {
+        await FirebaseFirestore.instance.enablePersistence(
+          const PersistenceSettings(synchronizeTabs: true),
+        );
+      } catch (e) {
+        print('Persistence already enabled or not supported: $e');
+      }
+    }
+
+    // Explicitly enable network
+    await FirebaseFirestore.instance.enableNetwork();
+
+    print('Firebase initialized successfully with emulator');
+  } catch (e) {
+    print('Error initializing Firebase: $e');
+  }
   
   runApp(const MyApp());
 }
@@ -31,70 +62,10 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Knowing',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
+        primarySwatch: Colors.blue,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: const SplashScreen(),
-    );
-  }
-}
-
-class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
-
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    // Navigate to AuthWrapper after 2 seconds
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const AuthWrapper()),
-        );
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Add your app logo here
-            const CircularProgressIndicator(),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class AuthWrapper extends StatelessWidget {
-  const AuthWrapper({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasData) {
-          return const HomeScreen();
-        }
-
-        return const LoginScreen();
-      },
+      home: const LoginScreen(),
     );
   }
 }

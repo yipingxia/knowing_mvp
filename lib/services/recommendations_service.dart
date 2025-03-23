@@ -1,26 +1,28 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/recommendation.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../services/user_service.dart';
 
 class RecommendationsService {
   final FirebaseFirestore _firestore;
-  final FirebaseAuth _auth;
+  final UserService _userService;
 
-  RecommendationsService(this._firestore) : _auth = FirebaseAuth.instance;
+  RecommendationsService(this._firestore) : _userService = UserService();
 
   // Get the user's recommendations collection reference
-  CollectionReference<Map<String, dynamic>> get _recommendationsRef {
-    final userId = _auth.currentUser?.uid;
-    if (userId == null) {
+  Future<CollectionReference<Map<String, dynamic>>> get _recommendationsRef async {
+    final username = _userService.getUsernameFromStorage();
+    if (username == null) {
       throw Exception('User not authenticated');
     }
-    return _firestore.collection('users').doc(userId).collection('recommendations');
+    return _firestore.collection('users').doc(username).collection('dailyRecos');
   }
 
   Future<void> saveRecommendation(Recommendation recommendation) async {
     try {
       final docId = _formatDate(recommendation.date);
-      await _recommendationsRef.doc(docId).set(recommendation.toMap());
+      final recommendationsRef = await _recommendationsRef;
+      print('Saving recommendation to dailyRecos collection with ID: $docId');
+      await recommendationsRef.doc(docId).set(recommendation.toMap());
     } catch (e) {
       print('Error saving recommendation: $e');
       rethrow;
@@ -30,7 +32,8 @@ class RecommendationsService {
   Future<Recommendation?> getRecommendations(DateTime date) async {
     try {
       final docId = _formatDate(date);
-      final doc = await _recommendationsRef.doc(docId).get();
+      final recommendationsRef = await _recommendationsRef;
+      final doc = await recommendationsRef.doc(docId).get();
       
       if (doc.exists) {
         return Recommendation.fromMap(doc.data()!);
@@ -44,11 +47,13 @@ class RecommendationsService {
 
   Stream<Recommendation?> watchRecommendations(DateTime date) {
     final docId = _formatDate(date);
-    return _recommendationsRef.doc(docId).snapshots().map((doc) {
-      if (doc.exists) {
-        return Recommendation.fromMap(doc.data()!);
-      }
-      return null;
+    return Stream.fromFuture(_recommendationsRef).asyncExpand((recommendationsRef) {
+      return recommendationsRef.doc(docId).snapshots().map((doc) {
+        if (doc.exists) {
+          return Recommendation.fromMap(doc.data()!);
+        }
+        return null;
+      });
     });
   }
 

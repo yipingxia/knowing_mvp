@@ -60,7 +60,7 @@
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
 
@@ -90,39 +90,41 @@
       googleProvider
     };
 
-    // Initialize Google Sign-In
-    window.google.accounts.id.initialize({
-      client_id: '349439956510-ujkel05mrtl17fk998udu1mc85pq3ai9.apps.googleusercontent.com',
-      callback: async (response) => {
-        if (response.credential) {
-          const credential = googleProvider.credential(response.credential);
-          try {
-            const result = await auth.signInWithCredential(credential);
-            console.log('Successfully signed in:', result.user);
-            // Notify Flutter that sign-in was successful
-            window.flutter_inappwebview?.callHandler('onGoogleSignInSuccess', result.user);
-          } catch (error) {
-            console.error('Error signing in:', error);
-            // Notify Flutter that sign-in failed
-            window.flutter_inappwebview?.callHandler('onGoogleSignInError', error.message);
-          }
+    // Function to trigger Google Sign-In
+    window.signInWithGoogle = async function() {
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        console.log('Successfully signed in:', result.user);
+        const idToken = await result.user.getIdToken();
+        
+        // Use the proper method to communicate with Flutter
+        if (window.flutter_inappwebview) {
+          window.flutter_inappwebview.callHandler('onGoogleSignInSuccess', idToken);
+        } else if (window.flutterWebRenderer) {
+          window.flutterWebRenderer.callMethod('onGoogleSignInSuccess', [idToken]);
+        } else {
+          // Use the proper method to communicate with Flutter web
+          window.flutterWebRenderer = {
+            callMethod: function(methodName, args) {
+              if (methodName === 'onGoogleSignInSuccess') {
+                window.dispatchEvent(new CustomEvent('googleSignInSuccess', { detail: args[0] }));
+              } else if (methodName === 'onGoogleSignInError') {
+                window.dispatchEvent(new CustomEvent('googleSignInError', { detail: args[0] }));
+              }
+            }
+          };
+          window.flutterWebRenderer.callMethod('onGoogleSignInSuccess', [idToken]);
+        }
+      } catch (error) {
+        console.error('Error signing in:', error);
+        if (window.flutter_inappwebview) {
+          window.flutter_inappwebview.callHandler('onGoogleSignInError', error.message);
+        } else if (window.flutterWebRenderer) {
+          window.flutterWebRenderer.callMethod('onGoogleSignInError', [error.message]);
+        } else {
+          window.dispatchEvent(new CustomEvent('googleSignInError', { detail: error.message }));
         }
       }
-    });
-
-    // Function to trigger Google Sign-In
-    window.signInWithGoogle = function() {
-      window.google.accounts.id.prompt();
-      window.google.accounts.id.renderButton(
-        document.createElement('div'),
-        { 
-          type: 'standard',
-          theme: 'outline',
-          size: 'large',
-          width: 300,
-          text: 'signin_with'
-        }
-      );
     };
   </script>
 

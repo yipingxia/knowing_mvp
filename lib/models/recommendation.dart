@@ -18,12 +18,9 @@ class Recommendation {
   });
 
   factory Recommendation.fromMap(Map<String, dynamic> data) {
-    // Handle both nested and flat structures
-    final recommendationsData = data['recommendations'] ?? data;
-    
     // Parse recommendations map
-    final recommendationsMap = <String, List<String>>{};
-    final rawRecommendations = recommendationsData['recommendations'] as Map<String, dynamic>? ?? {};
+    final Map<String, List<String>> recommendationsMap = {};
+    final rawRecommendations = data['recommendations'] as Map<String, dynamic>? ?? {};
     
     rawRecommendations.forEach((key, value) {
       if (value is List) {
@@ -31,12 +28,22 @@ class Recommendation {
       }
     });
 
+    // Parse date from either Timestamp or String
+    DateTime parsedDate;
+    if (data['date'] is Timestamp) {
+      parsedDate = (data['date'] as Timestamp).toDate();
+    } else if (data['date'] is String) {
+      parsedDate = DateTime.parse(data['date']);
+    } else {
+      parsedDate = DateTime.now();
+    }
+
     return Recommendation(
-      date: (data['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      currentPhase: recommendationsData['current_phase'] as String? ?? 'Unknown',
-      daysSinceLastPeriod: recommendationsData['days_since_last_period'] as int? ?? 0,
-      keywords: (recommendationsData['keywords'] as List<dynamic>?)?.cast<String>() ?? [],
-      poeticMessage: recommendationsData['poetic_message'] as String? ?? '',
+      date: parsedDate,
+      currentPhase: data['current_phase'] as String? ?? 'Unknown',
+      daysSinceLastPeriod: data['days_since_last_period'] as int? ?? 0,
+      keywords: (data['keywords'] as List<dynamic>?)?.cast<String>() ?? [],
+      poeticMessage: data['poetic_message'] as String? ?? '',
       recommendations: recommendationsMap,
     );
   }
