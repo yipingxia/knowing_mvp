@@ -1,4 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Recommendation {
+  final DateTime date;
   final String currentPhase;
   final int daysSinceLastPeriod;
   final List<String> keywords;
@@ -6,6 +9,7 @@ class Recommendation {
   final Map<String, List<String>> recommendations;
 
   Recommendation({
+    required this.date,
     required this.currentPhase,
     required this.daysSinceLastPeriod,
     required this.keywords,
@@ -13,13 +17,13 @@ class Recommendation {
     required this.recommendations,
   });
 
-  factory Recommendation.fromJson(Map<String, dynamic> json) {
+  factory Recommendation.fromMap(Map<String, dynamic> data) {
     // Handle both nested and flat structures
-    final data = json['recommendations'] ?? json;
+    final recommendationsData = data['recommendations'] ?? data;
     
     // Parse recommendations map
     final recommendationsMap = <String, List<String>>{};
-    final rawRecommendations = data['recommendations'] as Map<String, dynamic>? ?? {};
+    final rawRecommendations = recommendationsData['recommendations'] as Map<String, dynamic>? ?? {};
     
     rawRecommendations.forEach((key, value) {
       if (value is List) {
@@ -28,15 +32,17 @@ class Recommendation {
     });
 
     return Recommendation(
-      currentPhase: data['current_phase'] as String? ?? 'Unknown',
-      daysSinceLastPeriod: data['days_since_last_period'] as int? ?? 0,
-      keywords: (data['keywords'] as List<dynamic>?)?.cast<String>() ?? [],
-      poeticMessage: data['poetic_message'] as String? ?? '',
+      date: (data['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      currentPhase: recommendationsData['current_phase'] as String? ?? 'Unknown',
+      daysSinceLastPeriod: recommendationsData['days_since_last_period'] as int? ?? 0,
+      keywords: (recommendationsData['keywords'] as List<dynamic>?)?.cast<String>() ?? [],
+      poeticMessage: recommendationsData['poetic_message'] as String? ?? '',
       recommendations: recommendationsMap,
     );
   }
 
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> toMap() => {
+    'date': Timestamp.fromDate(date),
     'current_phase': currentPhase,
     'days_since_last_period': daysSinceLastPeriod,
     'keywords': keywords,

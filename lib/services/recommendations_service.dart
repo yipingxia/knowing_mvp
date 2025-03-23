@@ -1,57 +1,57 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/recommendation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class RecommendationsService {
   final FirebaseFirestore _firestore;
-  static const String _collection = 'dailyRecos';
+  final FirebaseAuth _auth;
 
-  RecommendationsService(this._firestore);
+  RecommendationsService(this._firestore) : _auth = FirebaseAuth.instance;
 
-  // Get recommendations for a specific date
-  Future<Recommendation?> getRecommendations(dynamic date) async {
-    final formattedDate = _formatDate(date is DateTime ? date : DateTime.parse(date.toString()));
+  // Get the user's recommendations collection reference
+  CollectionReference<Map<String, dynamic>> get _recommendationsRef {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) {
+      throw Exception('User not authenticated');
+    }
+    return _firestore.collection('users').doc(userId).collection('recommendations');
+  }
+
+  Future<void> saveRecommendation(Recommendation recommendation) async {
     try {
-      print('Getting recommendations for date: $formattedDate');
-      final doc = await _firestore.collection(_collection).doc(formattedDate).get();
-      print('Document exists: ${doc.exists}');
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        print('Raw data: $data');
-        return Recommendation.fromJson(data);
+      final docId = _formatDate(recommendation.date);
+      await _recommendationsRef.doc(docId).set(recommendation.toMap());
+    } catch (e) {
+      print('Error saving recommendation: $e');
+      rethrow;
+    }
+  }
+
+  Future<Recommendation?> getRecommendations(DateTime date) async {
+    try {
+      final docId = _formatDate(date);
+      final doc = await _recommendationsRef.doc(docId).get();
+      
+      if (doc.exists) {
+        return Recommendation.fromMap(doc.data()!);
       }
       return null;
-    } catch (e, stackTrace) {
+    } catch (e) {
       print('Error getting recommendations: $e');
-      print('Stack trace: $stackTrace');
       return null;
     }
   }
 
-  // Watch recommendations for a specific date
-  Stream<Recommendation?> watchRecommendations(dynamic date) {
-    final formattedDate = _formatDate(date is DateTime ? date : DateTime.parse(date.toString()));
-    print('Watching recommendations for date: $formattedDate');
-    return _firestore
-        .collection(_collection)
-        .doc(formattedDate)
-        .snapshots()
-        .map((doc) {
-          if (doc.exists && doc.data() != null) {
-            final data = doc.data()!;
-            print('Received recommendation data: $data');
-            return Recommendation.fromJson(data);
-          }
-          print('No recommendation document exists for date: $formattedDate');
-          return null;
-        })
-        .handleError((error, stackTrace) {
-          print('Error in watchRecommendations: $error');
-          print('Stack trace: $stackTrace');
-          return null;
-        });
+  Stream<Recommendation?> watchRecommendations(DateTime date) {
+    final docId = _formatDate(date);
+    return _recommendationsRef.doc(docId).snapshots().map((doc) {
+      if (doc.exists) {
+        return Recommendation.fromMap(doc.data()!);
+      }
+      return null;
+    });
   }
 
-  // Helper function to format date as YYYY-MM-DD
   String _formatDate(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }

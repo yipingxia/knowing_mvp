@@ -148,12 +148,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 // Update sortedRecommendations if needed
                 if (_recommendation != null) {
                   final cardOrder = [
-                    'symptoms_management',
                     'exercise',
                     'nutrition',
                     'relationship',
                     'emotional_wellbeing',
                     'stress_management',
+                    'symptoms_management',
                     'tell_partner',
                   ];
                   sortedRecommendations = Map.fromEntries(
@@ -285,16 +285,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildRecommendationsSection() {
-    if (_recommendation == null) return const SizedBox.shrink();
+    if (_recommendation == null) return SizedBox.shrink();
 
     // Define the order of cards
     final cardOrder = [
-      'symptoms_management',
       'exercise',
       'nutrition',
       'relationship',
       'emotional_wellbeing',
       'stress_management',
+      'symptoms_management',
       'tell_partner',
     ];
 
@@ -601,7 +601,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                       onPressed: _isLoading ? null : _submitEntry,
                       child: _isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             height: 24,
                             width: 24,
                             child: CircularProgressIndicator(
@@ -781,7 +781,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // Update the summary tile to use the new edit handler
   Widget _buildTodaySummaryTile() {
-    if (_todayEntry == null) return const SizedBox.shrink();
+    if (_todayEntry == null) return SizedBox.shrink();
     
     return Container(
       decoration: cardDecoration,
@@ -793,7 +793,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("Today's Summary", style: titleStyle),
+                Text(
+                  "Today's Summary",
+                  style: GoogleFonts.unna(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w500,
+                    color: secondaryColor,
+                  ),
+                ),
                 TextButton.icon(
                   onPressed: _handleEditTap,
                   icon: const Icon(Icons.edit, color: secondaryColor, size: 20),
@@ -808,7 +815,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             if (_todayEntry!.notes.isNotEmpty)
               Text(
                 _todayEntry!.notes,
-                style: subtitleStyle,
               ),
             if (_todayEntry!.nutrition.isNotEmpty || _todayEntry!.exercise.isNotEmpty || 
                 _todayEntry!.emotion.isNotEmpty || _todayEntry!.symptoms.isNotEmpty) ...[
@@ -834,7 +840,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
   }
-
+  
   // Add this method to build input fields
   Widget _buildInputFields() {
     return Column(
@@ -849,7 +855,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 controller: _journalController,
                 maxLines: 5,
                 decoration: InputDecoration(
-                  hintText: 'Share your mood, symptoms, food intake, sleep quality, stress levels...',
+                  hintText: 'How are you today?',
                   hintStyle: subtitleStyle,
                   border: const OutlineInputBorder(
                     borderSide: BorderSide(color: borderColor),

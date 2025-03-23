@@ -12,6 +12,7 @@ class JournalEntry {
   final double? proteinGrams;
   final double? bodyStressLevel;
   final DateTime? lastPeriodDate;
+  final List<String> stressors;
 
   JournalEntry({
     required this.date,
@@ -27,6 +28,7 @@ class JournalEntry {
     this.proteinGrams,
     this.bodyStressLevel,
     this.lastPeriodDate,
+    this.stressors = const [],
   });
 
   // Create a copy of this JournalEntry with some fields updated
@@ -44,6 +46,7 @@ class JournalEntry {
     double? proteinGrams,
     double? bodyStressLevel,
     DateTime? lastPeriodDate,
+    List<String>? stressors,
   }) {
     return JournalEntry(
       date: date ?? this.date,
@@ -59,6 +62,7 @@ class JournalEntry {
       proteinGrams: proteinGrams ?? this.proteinGrams,
       bodyStressLevel: bodyStressLevel ?? this.bodyStressLevel,
       lastPeriodDate: lastPeriodDate ?? this.lastPeriodDate,
+      stressors: stressors ?? this.stressors,
     );
   }
 
@@ -78,6 +82,7 @@ class JournalEntry {
       'bodyStressLevel': bodyStressLevel,
       'notes': notes,
       'lastPeriodDate': lastPeriodDate?.toIso8601String(),
+      'stressors': stressors,
     };
   }
 
@@ -97,6 +102,7 @@ class JournalEntry {
       proteinGrams: map['proteinGrams']?.toDouble(),
       bodyStressLevel: map['bodyStressLevel']?.toDouble(),
       lastPeriodDate: map['lastPeriodDate'] != null ? DateTime.parse(map['lastPeriodDate']) : null,
+      stressors: List<String>.from(map['stressors'] ?? []),
     );
   }
 } 

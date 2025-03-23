@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/journal_entry.dart';
 import '../services/daily_log_service.dart';
 import 'interactive_input.dart';
@@ -53,18 +54,20 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Journal Entries',
-          style: TextStyle(
+          style: GoogleFonts.unna(
             color: Colors.black,
-            fontSize: 16,
+            fontSize: 24,
             fontWeight: FontWeight.w500,
           ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.black),
       ),
       body: StreamBuilder<List<JournalEntry>>(
         stream: _dailyLogService.getAllLogs(),
@@ -80,13 +83,19 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
           final entries = snapshot.data ?? [];
 
           if (entries.isEmpty) {
-            return const Center(
-              child: Text('No entries yet. Add your first entry!'),
+            return Center(
+              child: Text(
+                'No entries yet. Add your first entry!',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 16,
+                ),
+              ),
             );
           }
 
           return GridView.builder(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(24),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: 16,
@@ -124,17 +133,17 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
           children: [
             Text(
               DateFormat.MMMd().format(entry.date),
-              style: const TextStyle(
+              style: GoogleFonts.unna(
                 fontSize: 20,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w300,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               entry.phase,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
+              style: GoogleFonts.unna(
+                fontSize: 24,
+                fontWeight: FontWeight.w500,
               ),
             ),
             const SizedBox(height: 16),
@@ -145,7 +154,9 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
                 _buildStatItem('Sleep', _getSleepQualityText(entry.sleepQualityIndex)),
               ],
             ),
-            if (entry.nutrition.isNotEmpty || entry.exercise.isNotEmpty || entry.emotion.isNotEmpty || entry.symptoms.isNotEmpty) ...[
+            if (entry.nutrition.isNotEmpty || entry.exercise.isNotEmpty || 
+                entry.emotion.isNotEmpty || entry.symptoms.isNotEmpty ||
+                entry.stressors.isNotEmpty) ...[
               const SizedBox(height: 16),
               const Divider(height: 1),
               const SizedBox(height: 12),
@@ -161,6 +172,8 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
                     _buildTag('Emotion', entry.emotion),
                   if (entry.symptoms.isNotEmpty)
                     _buildTag('Symptoms', entry.symptoms),
+                  if (entry.stressors.isNotEmpty)
+                    _buildTag('Stressors', '${entry.stressors.length} selected'),
                 ],
               ),
             ],
@@ -168,7 +181,10 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
               const SizedBox(height: 12),
               Text(
                 entry.notes,
-                style: const TextStyle(fontSize: 12),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -189,6 +205,7 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey[600],
+              fontWeight: FontWeight.w400,
             ),
           ),
           const SizedBox(height: 4),
@@ -196,7 +213,7 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
             value,
             style: const TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w300,
             ),
           ),
         ],
@@ -237,14 +254,15 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w400,
             ),
           ),
           Text(
             displayValue,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w400,
+              color: Colors.grey[800],
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

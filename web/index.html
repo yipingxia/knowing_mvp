@@ -48,10 +48,85 @@
   <meta name="twitter:description" content="Understand your body throughout the cycle">
   <meta name="twitter:image" content="https://knowing-v1.web.app/icons/Icon-192.png">
 
+  <meta name="google-signin-client_id" content="349439956510-ujkel05mrtl17fk998udu1mc85pq3ai9.apps.googleusercontent.com">
   <title>Knowing</title>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <!-- Google API Client Library -->
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://accounts.google.com/gsi/client"></script>
+  
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCL8C6_q3CtPkg33xXA4SUxmDOSnW-dOH4",
+      authDomain: "knowing-v1.firebaseapp.com",
+      projectId: "knowing-v1",
+      storageBucket: "knowing-v1.firebasestorage.app",
+      messagingSenderId: "349439956510",
+      appId: "1:349439956510:web:158dcfc3b5aad153f2c00f",
+      measurementId: "G-B2DPWC59MJ"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const firestore = getFirestore(app);
+    const analytics = getAnalytics(app);
+    const googleProvider = new GoogleAuthProvider();
+
+    // Make Firebase available globally
+    window.firebase = {
+      app,
+      auth,
+      firestore,
+      analytics,
+      googleProvider
+    };
+
+    // Initialize Google Sign-In
+    window.google.accounts.id.initialize({
+      client_id: '349439956510-ujkel05mrtl17fk998udu1mc85pq3ai9.apps.googleusercontent.com',
+      callback: async (response) => {
+        if (response.credential) {
+          const credential = googleProvider.credential(response.credential);
+          try {
+            const result = await auth.signInWithCredential(credential);
+            console.log('Successfully signed in:', result.user);
+            // Notify Flutter that sign-in was successful
+            window.flutter_inappwebview?.callHandler('onGoogleSignInSuccess', result.user);
+          } catch (error) {
+            console.error('Error signing in:', error);
+            // Notify Flutter that sign-in failed
+            window.flutter_inappwebview?.callHandler('onGoogleSignInError', error.message);
+          }
+        }
+      }
+    });
+
+    // Function to trigger Google Sign-In
+    window.signInWithGoogle = function() {
+      window.google.accounts.id.prompt();
+      window.google.accounts.id.renderButton(
+        document.createElement('div'),
+        { 
+          type: 'standard',
+          theme: 'outline',
+          size: 'large',
+          width: 300,
+          text: 'signin_with'
+        }
+      );
+    };
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
+  <div id="flutter_target"></div>
 </body>
 </html>

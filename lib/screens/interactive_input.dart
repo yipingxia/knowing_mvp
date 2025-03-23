@@ -7,6 +7,7 @@ import '../models/recommendation.dart';
 import '../services/openai_service.dart';
 import '../services/recommendations_service.dart';
 import '../services/daily_log_service.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class InteractiveInputScreen extends StatefulWidget {
   final DateTime selectedDate;
@@ -26,14 +27,12 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
   double? _energyLevel; // Remove default value
   String _phase = ''; // Will be populated from daily log
   int? _sleepQualityIndex; // Remove default value
-  bool _isPhysicalActive = false;
-  bool _isEmotionalActive = true;
-  bool _isLifestyleActive = false;
   String _exercise = '';
   String _emotion = '';
   String _symptoms = '';
   String _nutrition = '';
   String _notes = '';
+  Set<String> _selectedStressors = {};
 
   // Controllers for text fields
   late final TextEditingController _exerciseController;
@@ -51,6 +50,21 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
   late final RecommendationsService _recommendationsService;
   late final DailyLogService _dailyLogService;
   StreamSubscription<Recommendation?>? _recommendationsSubscription;
+
+  // Add this list of stressors
+  final List<String> _stressors = [
+    'Work stress',
+    'Relationships',
+    'Social/peer pressure',
+    'Overthinking',
+    'Lack of rest',
+    'Pain or discomfort',
+    'Health concerns',
+    'Financial stress',
+    'Time management',
+    'Food/exercise',
+    'Technology overload',
+  ];
 
   @override
   void initState() {
@@ -77,6 +91,7 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
       _symptoms = widget.initialEntry!.symptoms;
       _nutrition = widget.initialEntry!.nutrition;
       _notes = widget.initialEntry!.notes;
+      _selectedStressors = Set<String>.from(widget.initialEntry!.stressors);
       
       // Update controllers
       _exerciseController.text = _exercise;
@@ -103,6 +118,7 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
           if (widget.initialEntry == null) {
             _energyLevel = todayLog.energyLevel;
             _sleepQualityIndex = todayLog.sleepQualityIndex;
+            _selectedStressors = Set<String>.from(todayLog.stressors);
             
             // Parse the notes field to extract individual components
             final notes = todayLog.notes;
@@ -128,9 +144,10 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
               }
             }
           } else {
-            // If we have an initial entry, use its notes
+            // If we have an initial entry, use its notes and stressors
             _notes = widget.initialEntry!.notes;
             _notesController.text = _notes;
+            _selectedStressors = Set<String>.from(widget.initialEntry!.stressors);
           }
         });
       }
@@ -197,10 +214,10 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
         emotion: _emotion,
         symptoms: _symptoms,
         nutrition: _nutrition,
-        // Only use the new notes if they were explicitly changed
         notes: _notesController.text == widget.initialEntry?.notes ? 
                widget.initialEntry!.notes : 
                _notes,
+        stressors: _selectedStressors.toList(),
       );
 
       JournalEntry updatedEntry = entry;
@@ -260,6 +277,7 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
         fiberGrams: updatedEntry.fiberGrams,
         proteinGrams: updatedEntry.proteinGrams,
         bodyStressLevel: updatedEntry.bodyStressLevel,
+        stressors: _selectedStressors.toList(),
       );
 
       // Save to daily logs
@@ -283,11 +301,11 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
       appBar: AppBar(
         title: Column(
           children: [
-            const Text(
+            Text(
               'Daily Check-in',
-              style: TextStyle(
+              style: GoogleFonts.unna(
                 color: Colors.black,
-                fontSize: 16,
+                fontSize: 24,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -311,50 +329,6 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top stats
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Current Phase',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        )
-                      ),
-                      Text(_phase,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        )
-                      ),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Energy Level',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        )
-                      ),
-                      Text(
-                        _energyLevel != null ? '${_energyLevel!.round()}%' : '--',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        )
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 40),
-
               // Energy and Sleep Quality section
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -523,6 +497,64 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 16),
+                  // Third row: Stressors
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Stressors',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _stressors.map((stressor) {
+                            final isSelected = _selectedStressors.contains(stressor);
+                            return FilterChip(
+                              label: Text(stressor),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                setState(() {
+                                  if (selected) {
+                                    _selectedStressors.add(stressor);
+                                  } else {
+                                    _selectedStressors.remove(stressor);
+                                  }
+                                });
+                              },
+                              backgroundColor: Colors.white,
+                              selectedColor: Colors.black87,
+                              labelStyle: TextStyle(
+                                color: isSelected ? Colors.white : Colors.black87,
+                                fontSize: 12,
+                              ),
+                              checkmarkColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                side: BorderSide(
+                                  color: isSelected ? Colors.black87 : Colors.grey[300]!,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
 
@@ -620,109 +652,81 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
                   ),
                 )
               else if (_recommendation != null)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Your Recommendations',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _recommendation!.poeticMessage,
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Current Phase: ${_recommendation!.currentPhase}',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 16),
-                        ..._recommendation!.recommendations.entries.map(
-                          (entry) => Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                entry.key.replaceAll('_', ' ').toUpperCase(),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              ...entry.value.map(
-                                (recommendation) => Padding(
-                                  padding: const EdgeInsets.only(
-                                    left: 16,
-                                    bottom: 8,
-                                  ),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text('• '),
-                                      Expanded(
-                                        child: Text(recommendation),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                            ],
-                          ),
-                        ),
-                      ],
+                ExpansionTile(
+                  title: Text(
+                    'Your Recommendations',
+                    style: TextStyle(
+                      color: Colors.grey[800],
+                      fontSize: 16,
                     ),
                   ),
+                  subtitle: Text(
+                    'Current Phase: ${_recommendation!.currentPhase}',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 14,
+                    ),
+                  ),
+                  initiallyExpanded: false,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Text(
+                        _recommendation!.poeticMessage,
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    ..._recommendation!.recommendations.entries.map(
+                      (entry) => Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              entry.key.replaceAll('_', ' ').toUpperCase(),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            ...entry.value.map(
+                              (recommendation) => Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 16,
+                                  bottom: 8,
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('• '),
+                                    Expanded(
+                                      child: Text(
+                                        recommendation,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
 
               const SizedBox(height: 24),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryToggle(String label, bool isEnabled, IconData icon) {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          if (label == 'PHYSICAL') _isPhysicalActive = !_isPhysicalActive;
-          if (label == 'EMOTIONAL') _isEmotionalActive = !_isEmotionalActive;
-          if (label == 'LIFESTYLE') _isLifestyleActive = !_isLifestyleActive;
-        });
-      },
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isEnabled ? Colors.black87 : Colors.grey[200],
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: isEnabled ? Colors.white : Colors.grey[600],
-              size: 24,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: isEnabled ? Colors.black87 : Colors.grey[600],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
       ),
     );
   }
