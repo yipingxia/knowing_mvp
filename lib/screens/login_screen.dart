@@ -10,14 +10,14 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _userService = UserService();
   bool _isLoading = false;
   String? _errorMessage;
-  bool _isNewUser = false;
   bool _obscurePassword = true;
+  late TabController _tabController;
 
   // Color scheme matching home screen
   static const Color primaryColor = Color(0xFF2C2C2C);
@@ -58,7 +58,16 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _checkStoredUsername();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   Future<void> _checkStoredUsername() async {
@@ -77,7 +86,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _handleLoginOrRegister() async {
+  Future<void> _handleLogin() async {
     final username = _usernameController.text.trim();
     final password = _passwordController.text;
     
@@ -97,23 +106,11 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      bool success;
-      if (_isNewUser) {
-        // Try to register new user
-        success = await _userService.registerUsername(username, password);
-        if (!success) {
-          setState(() => _errorMessage = 'Username already taken');
-          setState(() => _isLoading = false);
-          return;
-        }
-      } else {
-        // Try to verify existing user
-        success = await _userService.verifyUser(username, password);
-        if (!success) {
-          setState(() => _errorMessage = 'Invalid username or password');
-          setState(() => _isLoading = false);
-          return;
-        }
+      final success = await _userService.verifyUser(username, password);
+      if (!success) {
+        setState(() => _errorMessage = 'Invalid username or password');
+        setState(() => _isLoading = false);
+        return;
       }
 
       if (success && mounted) {
@@ -132,6 +129,145 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _handleRegister() async {
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text;
+    
+    if (username.isEmpty) {
+      setState(() => _errorMessage = 'Please enter a username');
+      return;
+    }
+    
+    if (password.isEmpty) {
+      setState(() => _errorMessage = 'Please enter a password');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final success = await _userService.registerUsername(username, password);
+      if (!success) {
+        setState(() => _errorMessage = 'Username already taken');
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      if (success && mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => HomeScreen(username: username),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _errorMessage = 'An error occurred. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Widget _buildForm(bool isLogin) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _usernameController,
+          decoration: InputDecoration(
+            labelText: 'Username',
+            labelStyle: subtitleStyle,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: borderColor),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: borderColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: primaryColor),
+            ),
+            errorText: _errorMessage,
+            errorStyle: TextStyle(
+              color: Colors.red[700],
+              fontSize: 12,
+            ),
+          ),
+          enabled: !_isLoading,
+          style: subtitleStyle,
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _passwordController,
+          obscureText: _obscurePassword,
+          decoration: InputDecoration(
+            labelText: 'Password',
+            labelStyle: subtitleStyle,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: borderColor),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: borderColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: primaryColor),
+            ),
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                color: subtitleColor,
+              ),
+              onPressed: () {
+                setState(() {
+                  _obscurePassword = !_obscurePassword;
+                });
+              },
+            ),
+          ),
+          enabled: !_isLoading,
+          style: subtitleStyle,
+        ),
+        const SizedBox(height: 24),
+        ElevatedButton(
+          onPressed: _isLoading ? null : (isLogin ? _handleLogin : _handleRegister),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: primaryColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            elevation: 0,
+          ),
+          child: _isLoading
+              ? SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : Text(
+                  isLogin ? 'Login' : 'Register',
+                  style: GoogleFonts.unna(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -142,7 +278,7 @@ class _LoginScreenState extends State<LoginScreen> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: Text(
-              'Get Knowing',
+              'Welcome to Knowing',
               style: GoogleFonts.unna(
                 color: primaryColor,
                 fontSize: 24,
@@ -161,123 +297,42 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'Track your daily wellness journey',
+                  'Know your body, know your lifestyle',
                   style: subtitleStyle,
                 ),
                 const SizedBox(height: 32),
-                Container(
-                  decoration: cardDecoration,
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextField(
-                        controller: _usernameController,
-                        decoration: InputDecoration(
-                          labelText: 'Username',
-                          labelStyle: subtitleStyle,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: borderColor),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: borderColor),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: primaryColor),
-                          ),
-                          errorText: _errorMessage,
-                          errorStyle: TextStyle(
-                            color: Colors.red[700],
-                            fontSize: 12,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: Container(
+                    decoration: cardDecoration,
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TabBar(
+                          controller: _tabController,
+                          labelColor: primaryColor,
+                          unselectedLabelColor: subtitleColor,
+                          indicatorColor: primaryColor,
+                          indicatorWeight: 2,
+                          tabs: const [
+                            Tab(text: 'Login'),
+                            Tab(text: 'Register'),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          height: 300,
+                          child: TabBarView(
+                            controller: _tabController,
+                            children: [
+                              _buildForm(true),
+                              _buildForm(false),
+                            ],
                           ),
                         ),
-                        enabled: !_isLoading,
-                        style: subtitleStyle,
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          labelStyle: subtitleStyle,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: borderColor),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: borderColor),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: primaryColor),
-                          ),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                              color: subtitleColor,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
-                          ),
-                        ),
-                        enabled: !_isLoading,
-                        style: subtitleStyle,
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: _isNewUser,
-                            onChanged: (bool? value) {
-                              setState(() {
-                                _isNewUser = value ?? false;
-                              });
-                            },
-                            activeColor: primaryColor,
-                          ),
-                          Text(
-                            'I am a new user',
-                            style: subtitleStyle,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: _isLoading ? null : _handleLoginOrRegister,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.all(16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: _isLoading
-                            ? SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : Text(
-                                _isNewUser ? 'Register' : 'Login',
-                                style: GoogleFonts.unna(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -286,12 +341,5 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _usernameController.dispose();
-    _passwordController.dispose();
-    super.dispose();
   }
 } 

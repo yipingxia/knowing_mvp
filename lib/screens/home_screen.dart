@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:ui';
 import '../services/openai_service.dart';
 import '../services/daily_log_service.dart';
 import '../models/recommendation.dart';
 import '../models/journal_entry.dart';
-import '../widgets/tarot_card.dart';
+import '../widgets/glass_card.dart';
 import '../screens/interactive_input.dart';
 import 'journal_entries_list.dart';
 import '../services/recommendations_service.dart';
 import '../services/user_service.dart';
 import 'login_screen.dart';
+import 'package:flutter/rendering.dart';
 
 class HomeScreen extends StatefulWidget {
   final String username;
@@ -96,6 +98,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late Map<String, List<String>> sortedRecommendations = {};
   JournalEntry? _todayEntry;
   late final UserService _userService;
+  int _currentPage = 0;
 
   _HomeScreenState()
       : _dailyLogService = DailyLogService(FirebaseFirestore.instance),
@@ -300,28 +303,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildRecommendationsSection() {
-    if (_recommendation == null) return SizedBox.shrink();
-
-    // Define the order of cards
-    final cardOrder = [
-      'exercise',
-      'nutrition',
-      'relationship',
-      'emotional_wellbeing',
-      'stress_management',
-      'symptoms_management',
-      'tell_partner',
-    ];
-
-    // Update sortedRecommendations with new data
-    sortedRecommendations = Map.fromEntries(
-      cardOrder.map((key) => MapEntry(
-        key, 
-        _recommendation!.recommendations[key] ?? [],
-      )),
-    );
+    if (_recommendation == null) {
+      return const SizedBox.shrink();
+    }
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 16),
         // Pill-style Tab Bar
@@ -409,47 +396,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             }).toList(),
           ),
         ),
-        // Swipeable Cards
+        const SizedBox(height: 24),
+        // Cards container
         SizedBox(
-          height: 500,
-          child: GestureDetector(
-            onHorizontalDragEnd: (details) {
-              if (details.primaryVelocity! > 0) {
-                // Swipe right - go to previous
-                if (_tabController.index > 0) {
-                  _tabController.animateTo(_tabController.index - 1);
-                }
-              } else if (details.primaryVelocity! < 0) {
-                // Swipe left - go to next
-                if (_tabController.index < _tabController.length - 1) {
-                  _tabController.animateTo(_tabController.index + 1);
-                }
-              }
+          height: 400,
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: sortedRecommendations.length,
+            onPageChanged: (index) {
+              setState(() {
+                _currentPage = index;
+              });
             },
-            child: PageView(
-              controller: _pageController,
-              onPageChanged: (index) {
-                setState(() {
-                  _tabController.animateTo(index);
-                  _scrollPillIntoView(index);
-                });
-              },
-              children: sortedRecommendations.entries.map((entry) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 24.0,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 720),
-                    child: TarotCard(
-                      title: entry.key.replaceAll('_', ' '),
-                      recommendations: entry.value,
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
+            itemBuilder: (context, index) {
+              final currentTitle = sortedRecommendations.keys.toList()[index].replaceAll('_', ' ').toUpperCase();
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: GlassCard(
+                  title: currentTitle,
+                  recommendations: sortedRecommendations.values.toList()[index],
+                  rotationAngle: 0,
+                ),
+              );
+            },
           ),
         ),
       ],
@@ -563,14 +532,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: backgroundColor,
+        backgroundColor: Colors.transparent,
         title: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: Text(
-              'Daily Lifestyle Logs',
+              'Get Knowing',
               style: GoogleFonts.unna(
                 color: primaryColor,
                 fontSize: 24,
@@ -588,106 +557,121 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ],
         elevation: 0,
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Show either summary tile or input fields
-                if (_isEditing)
-                  _buildInputFields()
-                else
-                  _buildTodaySummaryTile(),
-
-                // Submit Button
-                if (_isEditing) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.all(16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                      ),
-                      onPressed: _isLoading ? null : _submitEntry,
-                      child: _isLoading
-                        ? SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : Text(
-                            'Submit Entry',
-                            style: GoogleFonts.unna(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                    ),
-                  ),
-                ],
-
-                if (_recommendation != null || _isLoading) ...[
-                  const SizedBox(height: 24),
-                  
-                  if (_isLoading)
-                    _buildLoadingSkeleton()
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white,
+              Colors.blue.shade50,
+              Colors.purple.shade50,
+              Colors.pink.shade50,
+            ],
+            stops: const [0.0, 0.3, 0.7, 1.0],
+          ),
+        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Show either summary tile or input fields
+                  if (_isEditing)
+                    _buildInputFields()
                   else
-                    Center(
-                      child: Column(
-                        children: [
-                          Text(
-                            'CURRENT PHASE (estimated)',
-                            style: phaseHeaderStyle,
+                    _buildTodaySummaryTile(),
+
+                  // Submit Button
+                  if (_isEditing) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.all(16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _recommendation!.currentPhase.toUpperCase(),
-                            style: phaseTextStyle,
-                          ),
-                          const SizedBox(height: 16),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12.0),
-                              decoration: BoxDecoration(
-                                border: Border(
-                                  top: BorderSide(color: primaryColor.withOpacity(0.1), width: 1),
-                                  bottom: BorderSide(color: primaryColor.withOpacity(0.1), width: 1),
-                                ),
+                          elevation: 0,
+                        ),
+                        onPressed: _isLoading ? null : _submitEntry,
+                        child: _isLoading
+                          ? SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
-                              child: Text(
-                                _recommendation!.poeticMessage,
-                                style: GoogleFonts.unna(
-                                  fontSize: 16,
-                                  fontStyle: FontStyle.italic,
-                                  color: primaryColor,
-                                  height: 1.6,
-                                  letterSpacing: 0.5,
-                                ),
-                                textAlign: TextAlign.center,
+                            )
+                          : Text(
+                              'Submit Entry',
+                              style: GoogleFonts.unna(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                          ),
-                        ],
                       ),
                     ),
+                  ],
+
+                  if (_recommendation != null || _isLoading) ...[
+                    const SizedBox(height: 24),
+                    
+                    if (_isLoading)
+                      _buildLoadingSkeleton()
+                    else
+                      Center(
+                        child: Column(
+                          children: [
+                            Text(
+                              'CURRENT PHASE (estimated)',
+                              style: phaseHeaderStyle,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _recommendation!.currentPhase.toUpperCase(),
+                              style: phaseTextStyle,
+                            ),
+                            const SizedBox(height: 16),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12.0),
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                    top: BorderSide(color: primaryColor.withOpacity(0.1), width: 1),
+                                    bottom: BorderSide(color: primaryColor.withOpacity(0.1), width: 1),
+                                  ),
+                                ),
+                                child: Text(
+                                  _recommendation!.poeticMessage,
+                                  style: GoogleFonts.unna(
+                                    fontSize: 16,
+                                    fontStyle: FontStyle.italic,
+                                    color: primaryColor,
+                                    height: 1.6,
+                                    letterSpacing: 0.5,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
 
                     const SizedBox(height: 32),
 
                     _buildRecommendationsSection(),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -827,73 +811,96 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildTodaySummaryTile() {
     if (_todayEntry == null) return SizedBox.shrink();
     
-    return Container(
-      decoration: cardDecoration,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.85),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  "Today's Summary",
-                  style: GoogleFonts.unna(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w500,
-                    color: secondaryColor,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Your day",
+                      style: GoogleFonts.unna(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: primaryColor,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: _handleEditTap,
+                      icon: const Icon(Icons.edit, color: secondaryColor, size: 20),
+                      label: Text(
+                        'Edit',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: secondaryColor,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                TextButton.icon(
-                  onPressed: _handleEditTap,
-                  icon: const Icon(Icons.edit, color: secondaryColor, size: 20),
-                  label: Text(
-                    'Edit',
-                    style: subtitleStyle.copyWith(color: secondaryColor),
+                if (_todayEntry!.notes.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    _todayEntry!.notes,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: primaryColor.withOpacity(0.8),
+                      height: 1.5,
+                    ),
                   ),
-                ),
+                ],
+                if (_todayEntry!.energyLevel > 0 || _todayEntry!.sleepQualityIndex > 0 || 
+                    _todayEntry!.nutrition.isNotEmpty || _todayEntry!.exercise.isNotEmpty || 
+                    _todayEntry!.emotion.isNotEmpty || _todayEntry!.symptoms.isNotEmpty ||
+                    _todayEntry!.stressors.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (_todayEntry!.energyLevel > 0)
+                        _buildTag('Energy', '${_todayEntry!.energyLevel.round()}%'),
+                      if (_todayEntry!.sleepQualityIndex > 0)
+                        _buildTag('Sleep', _getSleepQualityText(_todayEntry!.sleepQualityIndex)),
+                      if (_todayEntry!.nutrition.isNotEmpty)
+                        _buildTag('Nutrition', _todayEntry!.nutrition, entry: _todayEntry),
+                      if (_todayEntry!.exercise.isNotEmpty)
+                        _buildTag('Exercise', _todayEntry!.exercise, entry: _todayEntry),
+                      if (_todayEntry!.emotion.isNotEmpty)
+                        _buildTag('Emotion', _todayEntry!.emotion),
+                      if (_todayEntry!.symptoms.isNotEmpty)
+                        _buildTag('Symptoms', _todayEntry!.symptoms),
+                      if (_todayEntry!.stressors.isNotEmpty)
+                        _buildTag('Stressors', '${_todayEntry!.stressors.length} selected'),
+                    ],
+                  ),
+                ],
               ],
             ),
-            const SizedBox(height: 16),
-            if (_todayEntry!.notes.isNotEmpty) ...[
-              Text(
-                _todayEntry!.notes,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[800],
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-            if (_todayEntry!.energyLevel > 0 || _todayEntry!.sleepQualityIndex > 0 || 
-                _todayEntry!.nutrition.isNotEmpty || _todayEntry!.exercise.isNotEmpty || 
-                _todayEntry!.emotion.isNotEmpty || _todayEntry!.symptoms.isNotEmpty ||
-                _todayEntry!.stressors.isNotEmpty) ...[
-              const Divider(height: 1),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (_todayEntry!.energyLevel > 0)
-                    _buildTag('Energy', '${_todayEntry!.energyLevel.round()}%'),
-                  if (_todayEntry!.sleepQualityIndex > 0)
-                    _buildTag('Sleep', _getSleepQualityText(_todayEntry!.sleepQualityIndex)),
-                  if (_todayEntry!.nutrition.isNotEmpty)
-                    _buildTag('Nutrition', _todayEntry!.nutrition, entry: _todayEntry),
-                  if (_todayEntry!.exercise.isNotEmpty)
-                    _buildTag('Exercise', _todayEntry!.exercise, entry: _todayEntry),
-                  if (_todayEntry!.emotion.isNotEmpty)
-                    _buildTag('Emotion', _todayEntry!.emotion),
-                  if (_todayEntry!.symptoms.isNotEmpty)
-                    _buildTag('Symptoms', _todayEntry!.symptoms),
-                  if (_todayEntry!.stressors.isNotEmpty)
-                    _buildTag('Stressors', '${_todayEntry!.stressors.length} selected'),
-                ],
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );
