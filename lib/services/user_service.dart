@@ -144,7 +144,7 @@ class UserService {
   }
 
   // Clear username from localStorage
-  void clearUsernameFromStorage() {
+  Future<void> clearUsernameFromStorage() async {
     try {
       print('Clearing username from localStorage');
       html.window.localStorage.remove(_usernameKey);
@@ -171,5 +171,9 @@ class UserService {
       }
       return null;
     }
+  }
+
+  Future<bool> login(String username, String password) async {
+    return verifyUser(username, password);
   }
 } 

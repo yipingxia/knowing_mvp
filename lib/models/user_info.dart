@@ -13,8 +13,8 @@ enum ActivityLevel {
 
 class UserInfo {
   final Gender gender;
-  final double height; // in cm
-  final double weight; // in kg
+  final int height; // in cm
+  final int weight; // in kg
   final DateTime birthDate;
   final ActivityLevel activityLevel;
   final DateTime? lastUpdated;
@@ -35,8 +35,8 @@ class UserInfo {
   // Factory constructor to create UserInfo with calculated recommendations
   factory UserInfo.create({
     required Gender gender,
-    required double height,
-    required double weight,
+    required int height,
+    required int weight,
     required DateTime birthDate,
     required ActivityLevel activityLevel,
     DateTime? lastUpdated,
@@ -48,8 +48,8 @@ class UserInfo {
       birthDate: birthDate,
       activityLevel: activityLevel,
       lastUpdated: lastUpdated,
-      recommendedFiberIntake: _calculateRecommendedFiber(weight, activityLevel),
-      recommendedProteinIntake: _calculateRecommendedProtein(weight, activityLevel),
+      recommendedFiberIntake: _calculateRecommendedFiber(weight.toDouble(), activityLevel),
+      recommendedProteinIntake: _calculateRecommendedProtein(weight.toDouble(), activityLevel),
     );
   }
 
@@ -62,6 +62,35 @@ class UserInfo {
       age--;
     }
     return age;
+  }
+
+  // Calculate recommended daily calories based on weight and activity level
+  double get recommendedCalories {
+    // Base calorie needs per kg of body weight based on activity level
+    double caloriesPerKg;
+    switch (activityLevel) {
+      case ActivityLevel.sedentary:
+        caloriesPerKg = 25; // 25 calories per kg for sedentary
+        break;
+      case ActivityLevel.light:
+        caloriesPerKg = 30;
+        break;
+      case ActivityLevel.moderate:
+        caloriesPerKg = 35;
+        break;
+      case ActivityLevel.active:
+        caloriesPerKg = 40;
+        break;
+      case ActivityLevel.veryActive:
+        caloriesPerKg = 45;
+        break;
+      case ActivityLevel.professional:
+        caloriesPerKg = 50;
+        break;
+    }
+
+    // Calculate total daily calories
+    return weight * caloriesPerKg;
   }
 
   // Calculate recommended fiber intake based on activity level and weight
@@ -140,19 +169,19 @@ class UserInfo {
       (e) => e.toString() == map['activityLevel'],
       orElse: () => ActivityLevel.sedentary,
     );
-    final weight = (map['weight'] as num).toDouble();
+    final weight = (map['weight'] as num).toInt();
 
     return UserInfo(
       gender: gender,
-      height: (map['height'] as num).toDouble(),
+      height: (map['height'] as num).toInt(),
       weight: weight,
       birthDate: birthDate,
       activityLevel: activityLevel,
       lastUpdated: map['lastUpdated'] != null 
         ? (map['lastUpdated'] as Timestamp).toDate()
         : null,
-      recommendedFiberIntake: _calculateRecommendedFiber(weight, activityLevel),
-      recommendedProteinIntake: _calculateRecommendedProtein(weight, activityLevel),
+      recommendedFiberIntake: _calculateRecommendedFiber(weight.toDouble(), activityLevel),
+      recommendedProteinIntake: _calculateRecommendedProtein(weight.toDouble(), activityLevel),
     );
   }
 
@@ -173,8 +202,8 @@ class UserInfo {
   // Create a copy with some fields updated
   UserInfo copyWith({
     Gender? gender,
-    double? height,
-    double? weight,
+    int? height,
+    int? weight,
     DateTime? birthDate,
     ActivityLevel? activityLevel,
     DateTime? lastUpdated,
@@ -191,8 +220,8 @@ class UserInfo {
       birthDate: newBirthDate,
       activityLevel: newActivityLevel,
       lastUpdated: lastUpdated ?? this.lastUpdated,
-      recommendedFiberIntake: _calculateRecommendedFiber(newWeight, newActivityLevel),
-      recommendedProteinIntake: _calculateRecommendedProtein(newWeight, newActivityLevel),
+      recommendedFiberIntake: _calculateRecommendedFiber(newWeight.toDouble(), newActivityLevel),
+      recommendedProteinIntake: _calculateRecommendedProtein(newWeight.toDouble(), newActivityLevel),
     );
   }
 } 

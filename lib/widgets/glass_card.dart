@@ -1,13 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'dart:ui';
+import '../theme/app_theme.dart';
 
 class GlassCard extends StatelessWidget {
-  static const Color primaryColor = Color(0xFF2C2C2C);
-  static const Color secondaryColor = Color(0xFF4A4A4A);
-  static const Color surfaceColor = Color(0xFFF5F5F5);
-  static const Color borderColor = Color(0xFFE0E0E0);
-
   final String title;
   final List<String> recommendations;
   final double rotationAngle;
@@ -22,80 +16,54 @@ class GlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Transform.rotate(
-      angle: rotationAngle,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.85),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.3),
-                width: 1.5,
+      angle: rotationAngle * (3.14159265359 / 180),
+      child: Container(
+        decoration: AppTheme.glassCardDecoration,
+        child: Padding(
+          padding: AppTheme.cardPadding,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title.toUpperCase(),
+                style: AppTheme.cardTitleStyle,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 15,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title at the top with Unna font
-                  Text(
-                    title.toUpperCase(),
-                    style: GoogleFonts.unna(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: primaryColor,
-                      letterSpacing: 1.2,
+              const Spacer(),
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: recommendations.length,
+                itemBuilder: (context, index) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Icon(
+                            Icons.auto_awesome,
+                            size: 12,
+                            color: AppTheme.secondaryColor,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            recommendations[index],
+                            style: AppTheme.cardBodyStyle,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const Spacer(), // Push recommendations to bottom
-                  // Recommendations at the bottom with default font
-                  ...recommendations.map((recommendation) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.5),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Icon(
-                              Icons.auto_awesome,
-                              size: 16,
-                              color: secondaryColor,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              recommendation,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: primaryColor.withOpacity(0.8),
-                                height: 1.5,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ],
+                  );
+                },
               ),
-            ),
+            ],
           ),
         ),
       ),

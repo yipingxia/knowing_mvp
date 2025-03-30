@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_info.dart';
 import '../services/user_info_service.dart';
 import 'package:intl/intl.dart';
+import '../theme/app_theme.dart';
 
 class UserInfoScreen extends StatefulWidget {
   const UserInfoScreen({super.key});
@@ -13,11 +14,13 @@ class UserInfoScreen extends StatefulWidget {
 }
 
 class _UserInfoScreenState extends State<UserInfoScreen> {
-  late final UserInfoService _userInfoService;
+  final UserInfoService _userInfoService = UserInfoService(FirebaseFirestore.instance);
+  UserInfo? _userInfo;
   bool _isLoading = true;
+  bool _isEditing = false;
   Gender _selectedGender = Gender.female;
-  double _height = 165; // Default height
-  double _weight = 60; // Default weight
+  int _height = 165; // Default height
+  int _weight = 60; // Default weight
   DateTime _birthDate = DateTime.now().subtract(const Duration(days: 365 * 25)); // Default age 25
   ActivityLevel _activityLevel = ActivityLevel.sedentary;
   
@@ -30,7 +33,6 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
   @override
   void initState() {
     super.initState();
-    _userInfoService = UserInfoService(FirebaseFirestore.instance);
     _loadUserInfo();
   }
 
@@ -39,6 +41,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
       final userInfo = await _userInfoService.getUserInfo();
       if (userInfo != null && mounted) {
         setState(() {
+          _userInfo = userInfo;
           _selectedGender = userInfo.gender;
           _height = userInfo.height;
           _weight = userInfo.weight;
@@ -74,8 +77,10 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
 
       await _userInfoService.saveUserInfo(userInfo);
       if (mounted) {
-        // Navigate back to home screen
-        Navigator.pop(context);
+        setState(() {
+          _isEditing = false;
+          _isLoading = false;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -92,11 +97,11 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
 
   Widget _buildSliderSection({
     required String title,
-    required double value,
-    required double min,
-    required double max,
+    required int value,
+    required int min,
+    required int max,
     required String unit,
-    required ValueChanged<double> onChanged,
+    required ValueChanged<int> onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -111,7 +116,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          '${value.round()}$unit',
+          '$value$unit',
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
@@ -132,10 +137,11 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
                 trackHeight: 8.0,
               ),
               child: Slider(
-                value: value,
-                min: min,
-                max: max,
-                onChanged: onChanged,
+                value: value.toDouble(),
+                min: min.toDouble(),
+                max: max.toDouble(),
+                divisions: max - min,
+                onChanged: (value) => onChanged(value.round()),
               ),
             ),
           ),
@@ -293,194 +299,144 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: Text(
-          'Profile Information',
-          style: GoogleFonts.unna(
-            color: primaryColor,
-            fontSize: 24,
-            fontWeight: FontWeight.w500,
+        backgroundColor: Colors.transparent,
+        title: Center(
+          child: ConstrainedBox(
+            constraints: AppTheme.maxWidthConstraint,
+            child: Text(
+              'User Information',
+              style: AppTheme.appBarTitleStyle,
+            ),
           ),
         ),
         elevation: 0,
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: primaryColor),
       ),
-      body: _isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Gender Selection
-                Text(
-                  'Gender',
-                  style: GoogleFonts.unna(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                    color: primaryColor,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: surfaceColor,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: borderColor),
-                    ),
-                    child: SegmentedButton<Gender>(
-                      segments: const [
-                        ButtonSegment(
-                          value: Gender.female,
-                          label: Text('Female'),
-                        ),
-                        ButtonSegment(
-                          value: Gender.male,
-                          label: Text('Male'),
-                        ),
-                        ButtonSegment(
-                          value: Gender.other,
-                          label: Text('Other'),
-                        ),
-                      ],
-                      selected: {_selectedGender},
-                      onSelectionChanged: (Set<Gender> selection) {
-                        setState(() => _selectedGender = selection.first);
-                      },
-                      style: ButtonStyle(
-                        backgroundColor: MaterialStateProperty.resolveWith<Color>(
-                          (Set<MaterialState> states) {
-                            if (states.contains(MaterialState.selected)) {
-                              return primaryColor;
-                            }
-                            return Colors.transparent;
-                          },
-                        ),
-                        foregroundColor: MaterialStateProperty.resolveWith<Color>(
-                          (Set<MaterialState> states) {
-                            if (states.contains(MaterialState.selected)) {
-                              return Colors.white;
-                            }
-                            return primaryColor;
-                          },
-                        ),
-                        padding: MaterialStateProperty.all(
-                          const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        shape: MaterialStateProperty.all(
-                          RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Height and Weight Sliders in the same row
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildSliderSection(
-                        title: 'Height',
-                        value: _height,
-                        min: 110,
-                        max: 200,
-                        unit: 'cm',
-                        onChanged: (value) => setState(() => _height = value),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildSliderSection(
-                        title: 'Weight',
-                        value: _weight,
-                        min: 40,
-                        max: 180,
-                        unit: 'kg',
-                        onChanged: (value) => setState(() => _weight = value),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Activity Level
-                _buildActivityLevelSlider(),
-                const SizedBox(height: 24),
-
-                // Birth Date
-                Text(
-                  'Birth Date',
-                  style: GoogleFonts.unna(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                    color: primaryColor,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                InkWell(
-                  onTap: () => _selectDate(context),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: surfaceColor,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          DateFormat('MMMM d, yyyy').format(_birthDate),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: primaryColor,
-                          ),
-                        ),
-                        const Icon(
-                          Icons.calendar_today,
-                          color: secondaryColor,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Save Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _saveUserInfo,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.all(16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: Text(
-                      'Save',
-                      style: GoogleFonts.unna(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: AppTheme.backgroundGradientColors,
+            stops: const [0.0, 0.4, 0.8, 1.0],
           ),
+        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: AppTheme.maxWidthConstraint,
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : SingleChildScrollView(
+                    padding: AppTheme.screenPadding,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Profile Information',
+                              style: AppTheme.titleStyle,
+                            ),
+                            TextButton.icon(
+                              onPressed: () => setState(() => _isEditing = !_isEditing),
+                              icon: Icon(
+                                _isEditing ? Icons.save : Icons.edit,
+                                color: AppTheme.secondaryColor,
+                                size: 20,
+                              ),
+                              label: Text(
+                                _isEditing ? 'Save' : 'Edit',
+                                style: AppTheme.tagValueStyle,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppTheme.spacingMedium),
+                        GridView.count(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisCount: 2,
+                          mainAxisSpacing: AppTheme.spacingMedium,
+                          crossAxisSpacing: AppTheme.spacingMedium,
+                          childAspectRatio: 1.0,
+                          children: [
+                            _buildSummaryCard(
+                              'Gender',
+                              _userInfo?.gender.toString().split('.').last.capitalize() ?? 'Not set',
+                              Icons.person,
+                            ),
+                            _buildSummaryCard(
+                              'Height',
+                              _userInfo?.height != null ? '${_userInfo!.height} cm' : 'Not set',
+                              Icons.height,
+                            ),
+                            _buildSummaryCard(
+                              'Weight',
+                              _userInfo?.weight != null ? '${_userInfo!.weight} kg' : 'Not set',
+                              Icons.monitor_weight,
+                            ),
+                            _buildSummaryCard(
+                              'Age',
+                              _userInfo?.age != null ? '${_userInfo!.age} years' : 'Not set',
+                              Icons.cake,
+                            ),
+                            _buildSummaryCard(
+                              'Activity Level',
+                              _userInfo?.activityLevel.toString().split('.').last.capitalize() ?? 'Not set',
+                              Icons.directions_run,
+                            ),
+                            _buildSummaryCard(
+                              'Daily Intake',
+                              _userInfo?.recommendedCalories != null ? '${_userInfo!.recommendedCalories.round()} kcal' : 'Not set',
+                              Icons.restaurant,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
+        ),
+      ),
     );
+  }
+
+  Widget _buildSummaryCard(String title, String value, IconData icon) {
+    return Container(
+      decoration: AppTheme.glassCardDecoration,
+      child: Padding(
+        padding: AppTheme.glassCardPadding,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: AppTheme.secondaryColor,
+              size: 24,
+            ),
+            const SizedBox(height: AppTheme.spacingSmall),
+            Text(
+              title,
+              style: AppTheme.tagLabelStyle,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppTheme.spacingSmall),
+            Text(
+              value,
+              style: AppTheme.tagValueStyle,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+extension StringExtension on String {
+  String capitalize() {
+    return "${this[0].toUpperCase()}${substring(1)}";
   }
 } 

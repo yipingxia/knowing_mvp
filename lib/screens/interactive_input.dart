@@ -8,6 +8,7 @@ import '../services/openai_service.dart';
 import '../services/recommendations_service.dart';
 import '../services/daily_log_service.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../theme/app_theme.dart';
 
 class InteractiveInputScreen extends StatefulWidget {
   final DateTime selectedDate;
@@ -297,210 +298,274 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
     String formattedDate = DateFormat.yMMMMd().format(widget.selectedDate);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: Column(
-          children: [
-            Text(
-              'Daily Check-in',
-              style: GoogleFonts.unna(
-                color: Colors.black,
-                fontSize: 24,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            Text(
-              formattedDate,
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
         backgroundColor: Colors.transparent,
+        title: Center(
+          child: ConstrainedBox(
+            constraints: AppTheme.maxWidthConstraint,
+            child: Column(
+              children: [
+                Text(
+                  'Daily Check-in',
+                  style: AppTheme.titleStyle,
+                ),
+                Text(
+                  formattedDate,
+                  style: AppTheme.dateStyle,
+                ),
+              ],
+            ),
+          ),
+        ),
         elevation: 0,
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.black),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Energy and Sleep Quality section
-              Row(
+      body: Container(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: AppTheme.maxWidthConstraint,
+            child: SingleChildScrollView(
+              padding: AppTheme.screenPadding,
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Energy Level section
-                  Expanded(
-                    child: Column(
-                      children: [
-                        // Energy indicator
-                        Text(
-                          _energyLevel != null ? '${_energyLevel!.round()}%' : '--',
-                          style: const TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.w300,
-                          ),
-                        ),
-                        const Text(
-                          'Energy Level',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.black54,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        // Vertical Energy Slider
-                        SizedBox(
-                          height: 200,
-                          child: RotatedBox(
-                            quarterTurns: 3,
-                            child: SliderTheme(
-                              data: SliderTheme.of(context).copyWith(
-                                trackHeight: 4.0,
-                                trackShape: const RoundedRectSliderTrackShape(),
-                                activeTrackColor: Colors.black87,
-                                inactiveTrackColor: Colors.grey[300],
-                                thumbShape: const RoundSliderThumbShape(
-                                  enabledThumbRadius: 12.0,
-                                ),
-                                thumbColor: Colors.white,
-                                overlayColor: Colors.black.withAlpha(32),
-                                overlayShape: const RoundSliderOverlayShape(overlayRadius: 28.0),
-                              ),
-                              child: Slider(
-                                value: _energyLevel ?? 0,
-                                min: 0,
-                                max: 100,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _energyLevel = value;
-                                  });
-                                },
-                                onChangeStart: (value) {
-                                  if (_energyLevel == null) {
-                                    setState(() {
-                                      _energyLevel = value;
-                                    });
-                                  }
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  // Sleep Quality section
-                  Expanded(
-                    child: Column(
-                      children: [
-                        // Sleep quality indicator
-                        Text(
-                          _sleepQualityIndex != null ? _sleepQualities[_sleepQualityIndex!] : '--',
-                          style: const TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.w300,
-                          ),
-                        ),
-                        const Text(
-                          'Sleep Quality',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.black54,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        // Vertical Sleep Quality Slider
-                        SizedBox(
-                          height: 200,
-                          child: RotatedBox(
-                            quarterTurns: 3,
-                            child: SliderTheme(
-                              data: SliderTheme.of(context).copyWith(
-                                trackHeight: 4.0,
-                                trackShape: const RoundedRectSliderTrackShape(),
-                                activeTrackColor: Colors.black87,
-                                inactiveTrackColor: Colors.grey[300],
-                                thumbShape: const RoundSliderThumbShape(
-                                  enabledThumbRadius: 12.0,
-                                ),
-                                thumbColor: Colors.white,
-                                overlayColor: Colors.black.withAlpha(32),
-                                overlayShape: const RoundSliderOverlayShape(overlayRadius: 28.0),
-                                tickMarkShape: const RoundSliderTickMarkShape(),
-                                activeTickMarkColor: Colors.black87,
-                                inactiveTickMarkColor: Colors.grey[300],
-                                valueIndicatorShape: const PaddleSliderValueIndicatorShape(),
-                                valueIndicatorColor: Colors.black87,
-                                valueIndicatorTextStyle: const TextStyle(color: Colors.white),
-                              ),
-                              child: Slider(
-                                value: _sleepQualityIndex?.toDouble() ?? 0,
-                                min: 0,
-                                max: 4,
-                                divisions: 4,
-                                label: _sleepQualityIndex != null ? _sleepQualities[_sleepQualityIndex!] : 'Select',
-                                onChanged: (value) {
-                                  setState(() {
-                                    _sleepQualityIndex = value.round();
-                                  });
-                                },
-                                onChangeStart: (value) {
-                                  if (_sleepQualityIndex == null) {
-                                    setState(() {
-                                      _sleepQualityIndex = value.round();
-                                    });
-                                  }
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 40),
-
-              // Input Fields Grid
-              Column(
-                children: [
-                  // First row: Nutrition and Exercise
+                  if (_isAnalyzing)
+                    const Center(child: CircularProgressIndicator())
+                  else
+                    const SizedBox.shrink(),
+                  // Energy and Sleep Quality section
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Energy Level section
                       Expanded(
-                        child: _buildInputCard('Nutrition', _nutrition, (value) => setState(() => _nutrition = value)),
+                        child: Column(
+                          children: [
+                            // Energy indicator
+                            Text(
+                              _energyLevel != null ? '${_energyLevel!.round()}%' : '--',
+                              style: const TextStyle(
+                                fontSize: 48,
+                                fontWeight: FontWeight.w300,
+                              ),
+                            ),
+                            const Text(
+                              'Energy Level',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.black54,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            // Vertical Energy Slider
+                            SizedBox(
+                              height: 200,
+                              child: RotatedBox(
+                                quarterTurns: 3,
+                                child: SliderTheme(
+                                  data: SliderTheme.of(context).copyWith(
+                                    trackHeight: 4.0,
+                                    trackShape: const RoundedRectSliderTrackShape(),
+                                    activeTrackColor: Colors.black87,
+                                    inactiveTrackColor: Colors.grey[300],
+                                    thumbShape: const RoundSliderThumbShape(
+                                      enabledThumbRadius: 12.0,
+                                    ),
+                                    thumbColor: Colors.white,
+                                    overlayColor: Colors.black.withAlpha(32),
+                                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 28.0),
+                                  ),
+                                  child: Slider(
+                                    value: _energyLevel ?? 0,
+                                    min: 0,
+                                    max: 100,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _energyLevel = value;
+                                      });
+                                    },
+                                    onChangeStart: (value) {
+                                      if (_energyLevel == null) {
+                                        setState(() {
+                                          _energyLevel = value;
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(width: 16),
+                      
+                      // Sleep Quality section
                       Expanded(
-                        child: _buildInputCard('Exercise', _exercise, (value) => setState(() => _exercise = value)),
+                        child: Column(
+                          children: [
+                            // Sleep quality indicator
+                            Text(
+                              _sleepQualityIndex != null ? _sleepQualities[_sleepQualityIndex!] : '--',
+                              style: const TextStyle(
+                                fontSize: 48,
+                                fontWeight: FontWeight.w300,
+                              ),
+                            ),
+                            const Text(
+                              'Sleep Quality',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.black54,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            // Vertical Sleep Quality Slider
+                            SizedBox(
+                              height: 200,
+                              child: RotatedBox(
+                                quarterTurns: 3,
+                                child: SliderTheme(
+                                  data: SliderTheme.of(context).copyWith(
+                                    trackHeight: 4.0,
+                                    trackShape: const RoundedRectSliderTrackShape(),
+                                    activeTrackColor: Colors.black87,
+                                    inactiveTrackColor: Colors.grey[300],
+                                    thumbShape: const RoundSliderThumbShape(
+                                      enabledThumbRadius: 12.0,
+                                    ),
+                                    thumbColor: Colors.white,
+                                    overlayColor: Colors.black.withAlpha(32),
+                                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 28.0),
+                                    tickMarkShape: const RoundSliderTickMarkShape(),
+                                    activeTickMarkColor: Colors.black87,
+                                    inactiveTickMarkColor: Colors.grey[300],
+                                    valueIndicatorShape: const PaddleSliderValueIndicatorShape(),
+                                    valueIndicatorColor: Colors.black87,
+                                    valueIndicatorTextStyle: const TextStyle(color: Colors.white),
+                                  ),
+                                  child: Slider(
+                                    value: _sleepQualityIndex?.toDouble() ?? 0,
+                                    min: 0,
+                                    max: 4,
+                                    divisions: 4,
+                                    label: _sleepQualityIndex != null ? _sleepQualities[_sleepQualityIndex!] : 'Select',
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _sleepQualityIndex = value.round();
+                                      });
+                                    },
+                                    onChangeStart: (value) {
+                                      if (_sleepQualityIndex == null) {
+                                        setState(() {
+                                          _sleepQualityIndex = value.round();
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  // Second row: Emotion and Symptoms
-                  Row(
+
+                  const SizedBox(height: 40),
+
+                  // Input Fields Grid
+                  Column(
                     children: [
-                      Expanded(
-                        child: _buildInputCard('Emotion', _emotion, (value) => setState(() => _emotion = value)),
+                      // First row: Nutrition and Exercise
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildInputCard('Nutrition', _nutrition, (value) => setState(() => _nutrition = value)),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildInputCard('Exercise', _exercise, (value) => setState(() => _exercise = value)),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildInputCard('Symptoms', _symptoms, (value) => setState(() => _symptoms = value)),
+                      const SizedBox(height: 16),
+                      // Second row: Emotion and Symptoms
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildInputCard('Emotion', _emotion, (value) => setState(() => _emotion = value)),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildInputCard('Symptoms', _symptoms, (value) => setState(() => _symptoms = value)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Third row: Stressors
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Stressors',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: _stressors.map((stressor) {
+                                final isSelected = _selectedStressors.contains(stressor);
+                                return FilterChip(
+                                  label: Text(stressor),
+                                  selected: isSelected,
+                                  onSelected: (selected) {
+                                    setState(() {
+                                      if (selected) {
+                                        _selectedStressors.add(stressor);
+                                      } else {
+                                        _selectedStressors.remove(stressor);
+                                      }
+                                    });
+                                  },
+                                  backgroundColor: Colors.white,
+                                  selectedColor: Colors.black87,
+                                  labelStyle: TextStyle(
+                                    color: isSelected ? Colors.white : Colors.black87,
+                                    fontSize: 12,
+                                  ),
+                                  checkmarkColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    side: BorderSide(
+                                      color: isSelected ? Colors.black87 : Colors.grey[300]!,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  // Third row: Stressors
+
+                  const SizedBox(height: 24),
+
+                  // Notes Section
                   Container(
-                    width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.grey[100],
@@ -511,220 +576,161 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Stressors',
+                          'Notes',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                             color: Colors.black87,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: _stressors.map((stressor) {
-                            final isSelected = _selectedStressors.contains(stressor);
-                            return FilterChip(
-                              label: Text(stressor),
-                              selected: isSelected,
-                              onSelected: (selected) {
-                                setState(() {
-                                  if (selected) {
-                                    _selectedStressors.add(stressor);
-                                  } else {
-                                    _selectedStressors.remove(stressor);
-                                  }
-                                });
-                              },
-                              backgroundColor: Colors.white,
-                              selectedColor: Colors.black87,
-                              labelStyle: TextStyle(
-                                color: isSelected ? Colors.white : Colors.black87,
-                                fontSize: 12,
-                              ),
-                              checkmarkColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                side: BorderSide(
-                                  color: isSelected ? Colors.black87 : Colors.grey[300]!,
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                        const SizedBox(height: 8),
+                        TextField(
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            hintText: 'Add any additional notes...',
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          style: const TextStyle(
+                            fontSize: 14,
+                          ),
+                          onChanged: (value) {
+                            setState(() => _notes = value);
+                          },
+                          controller: _notesController,
                         ),
                       ],
                     ),
                   ),
+
+                  const SizedBox(height: 40),
+
+                  // Save Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isAnalyzing ? null : _saveEntry,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black87,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: _isAnalyzing
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text('Save Entry',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Recommendations section
+                  if (_isLoadingRecommendations)
+                    Center(
+                      child: Column(
+                        children: [
+                          const CircularProgressIndicator(),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Loading your personalized recommendations...',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (_recommendation != null)
+                    ExpansionTile(
+                      title: Text(
+                        'Your Recommendations',
+                        style: TextStyle(
+                          color: Colors.grey[800],
+                          fontSize: 16,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Current Phase: ${_recommendation!.currentPhase}',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                      ),
+                      initiallyExpanded: false,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          child: Text(
+                            _recommendation!.poeticMessage,
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontStyle: FontStyle.italic,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        ..._recommendation!.recommendations.entries.map(
+                          (entry) => Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  entry.key.replaceAll('_', ' ').toUpperCase(),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                ...entry.value.map(
+                                  (recommendation) => Padding(
+                                    padding: const EdgeInsets.only(
+                                      left: 16,
+                                      bottom: 8,
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('• '),
+                                        Expanded(
+                                          child: Text(
+                                            recommendation,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                  const SizedBox(height: 24),
                 ],
               ),
-
-              const SizedBox(height: 24),
-
-              // Notes Section
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Notes',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        hintText: 'Add any additional notes...',
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      style: const TextStyle(
-                        fontSize: 14,
-                      ),
-                      onChanged: (value) {
-                        setState(() => _notes = value);
-                      },
-                      controller: _notesController,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // Save Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isAnalyzing ? null : _saveEntry,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black87,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: _isAnalyzing
-                    ? const SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : const Text('Save Entry',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Recommendations section
-              if (_isLoadingRecommendations)
-                Center(
-                  child: Column(
-                    children: [
-                      const CircularProgressIndicator(),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Loading your personalized recommendations...',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else if (_recommendation != null)
-                ExpansionTile(
-                  title: Text(
-                    'Your Recommendations',
-                    style: TextStyle(
-                      color: Colors.grey[800],
-                      fontSize: 16,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'Current Phase: ${_recommendation!.currentPhase}',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                    ),
-                  ),
-                  initiallyExpanded: false,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: Text(
-                        _recommendation!.poeticMessage,
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontStyle: FontStyle.italic,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                    ..._recommendation!.recommendations.entries.map(
-                      (entry) => Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              entry.key.replaceAll('_', ' ').toUpperCase(),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            ...entry.value.map(
-                              (recommendation) => Padding(
-                                padding: const EdgeInsets.only(
-                                  left: 16,
-                                  bottom: 8,
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('• '),
-                                    Expanded(
-                                      child: Text(
-                                        recommendation,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-              const SizedBox(height: 24),
-            ],
+            ),
           ),
         ),
       ),

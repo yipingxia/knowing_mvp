@@ -16,6 +16,7 @@ import 'package:flutter/rendering.dart';
 import 'user_info_screen.dart';
 import '../services/user_info_service.dart';
 import '../models/user_info.dart';
+import '../theme/app_theme.dart';
 
 class HomeScreen extends StatefulWidget {
   final String username;
@@ -30,62 +31,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  // Color scheme
-  static const Color primaryColor = Color(0xFF2C2C2C);
-  static const Color secondaryColor = Color(0xFF4A4A4A);
-  static const Color surfaceColor = Color(0xFFF5F5F5);
-  static const Color borderColor = Color(0xFFE0E0E0);
-  static const Color backgroundColor = Colors.white;
-  static const Color textColor = Color(0xFF2C2C2C);
-  static const Color subtitleColor = Color(0xFF757575);
-
-  // Update text styles with Unna font
-  TextStyle get titleStyle => GoogleFonts.unna(
-    fontSize: 24,
-    fontWeight: FontWeight.bold,
-    color: primaryColor,
-    letterSpacing: 0.15,
-  );
-
-  TextStyle get subtitleStyle => GoogleFonts.unna(
-    fontSize: 18,
-    color: subtitleColor,
-    letterSpacing: 0.15,
-  );
-
-  TextStyle get phaseHeaderStyle => GoogleFonts.unna(
-    fontSize: 16,
-    fontWeight: FontWeight.w500,
-    color: subtitleColor,
-    letterSpacing: 1.5,
-  );
-
-  TextStyle get phaseTextStyle => GoogleFonts.unna(
-    fontSize: 32,
-    fontWeight: FontWeight.w600,
-    color: primaryColor,
-    letterSpacing: 0.5,
-  );
-
-  TextStyle get pillTextStyle => GoogleFonts.unna(
-    fontSize: 15,
-    fontWeight: FontWeight.w500,
-    letterSpacing: 0.5,
-  );
-
-  static final cardDecoration = BoxDecoration(
-    color: backgroundColor,
-    borderRadius: BorderRadius.circular(12),
-    border: Border.all(color: borderColor),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withOpacity(0.05),
-        blurRadius: 4,
-        offset: const Offset(0, 2),
-      ),
-    ],
-  );
-  
   final TextEditingController _journalController = TextEditingController();
   DateTime? _lastPeriodDate;
   final OpenAIService _openAIService = OpenAIService();
@@ -104,12 +49,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _currentPage = 0;
   final UserInfoService _userInfoService = UserInfoService(FirebaseFirestore.instance);
   UserInfo? _userInfo;
-
-  // Add these color constants at the top of the class with other constants
-  static const Color statusBlue = Color(0xFF2196F3);
-  static const Color statusGreen = Color(0xFF4CAF50);
-  static const Color statusRed = Color(0xFFF44336);
-  static const Color statusYellow = Color(0xFFFFC107);
 
   _HomeScreenState()
       : _dailyLogService = DailyLogService(FirebaseFirestore.instance),
@@ -268,7 +207,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         final String title = sortedRecommendations.keys.toList()[i].replaceAll('_', ' ').toUpperCase();
         // Estimate width: text width + horizontal padding + margins
         final textWidth = TextPainter(
-          text: TextSpan(text: title, style: pillTextStyle),
+          text: TextSpan(text: title, style: AppTheme.pillTextStyle),
           maxLines: 1,
           textDirection: TextDirection.ltr,
         )..layout();
@@ -278,7 +217,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       // Add half of the current pill's width
       final currentTitle = sortedRecommendations.keys.toList()[index].replaceAll('_', ' ').toUpperCase();
       final currentTextWidth = TextPainter(
-        text: TextSpan(text: currentTitle, style: pillTextStyle),
+        text: TextSpan(text: currentTitle, style: AppTheme.pillTextStyle),
         maxLines: 1,
         textDirection: TextDirection.ltr,
       )..layout();
@@ -337,116 +276,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 16),
-        // Pill-style Tab Bar
-        Container(
-          height: 40,
-          margin: const EdgeInsets.symmetric(horizontal: 8),
-          child: ListView(
-            controller: _pillScrollController,
-            scrollDirection: Axis.horizontal,
-            children: sortedRecommendations.keys.toList().asMap().entries.map((entry) {
-              final index = entry.key;
-              final title = entry.value.replaceAll('_', ' ').toUpperCase();
-              final isSelected = _tabController.index == index;
-              
-              return GestureDetector(
-                onTap: () {
-                  if (index < sortedRecommendations.length) {
-                    _tabController.animateTo(index);
-                    _pageController.animateToPage(
-                      index,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    );
-                    _scrollPillIntoView(index);
-                  }
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected ? primaryColor : surfaceColor,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSelected ? primaryColor : borderColor,
-                      width: isSelected ? 2 : 1,
-                    ),
-                    boxShadow: isSelected ? [
-                      BoxShadow(
-                        color: primaryColor.withOpacity(0.3),
-                        spreadRadius: 1,
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ] : null,
-                  ),
-                  child: Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          title,
-                          style: pillTextStyle.copyWith(
-                            color: isSelected ? Colors.white : secondaryColor,
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                          ),
-                        ),
-                        if (title == 'TELL PARTNER') ...[
-                          const SizedBox(width: 4),
-                          ShaderMask(
-                            shaderCallback: (Rect bounds) {
-                              return LinearGradient(
-                                colors: [
-                                  Colors.amber.shade300,
-                                  Colors.amber.shade100,
-                                  Colors.amber.shade300,
-                                ],
-                                stops: const [0.2, 0.5, 0.8],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ).createShader(bounds);
-                            },
-                            child: Icon(
-                              Icons.star,
-                              size: 14,
-                              color: isSelected ? Colors.white : Colors.white,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-        const SizedBox(height: 24),
-        // Cards container
-        SizedBox(
-          height: 400,
-          child: PageView.builder(
-            controller: _pageController,
-            itemCount: sortedRecommendations.length,
-            onPageChanged: (index) {
-              setState(() {
-                _currentPage = index;
-              });
-            },
-            itemBuilder: (context, index) {
-              final currentTitle = sortedRecommendations.keys.toList()[index].replaceAll('_', ' ').toUpperCase();
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: GlassCard(
-                  title: currentTitle,
-                  recommendations: sortedRecommendations.values.toList()[index],
-                  rotationAngle: 0,
-                ),
-              );
-            },
-          ),
+        const SizedBox(height: AppTheme.spacingMedium),
+        // Grid of recommendation cards
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+          childAspectRatio: 1.0,
+          padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingLarge),
+          children: sortedRecommendations.entries.map((entry) {
+            final title = entry.key.replaceAll('_', ' ').toUpperCase();
+            return GlassCard(
+              title: title,
+              recommendations: entry.value,
+              rotationAngle: 0,
+            );
+          }).toList(),
         ),
       ],
     );
@@ -457,15 +304,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     required Widget content,
   }) {
     return Container(
-      decoration: cardDecoration,
+      decoration: AppTheme.glassCardDecoration,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: AppTheme.glassCardPadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (title != null) ...[
-              Text(title, style: titleStyle),
-              const SizedBox(height: 12),
+              Text(title, style: AppTheme.titleStyle),
+              const SizedBox(height: AppTheme.spacingMedium),
             ],
             content,
           ],
@@ -477,9 +324,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   BoxDecoration get _shimmerGradient => BoxDecoration(
     gradient: LinearGradient(
       colors: [
-        surfaceColor,
+        AppTheme.surfaceColor,
         Colors.white,
-        surfaceColor,
+        AppTheme.surfaceColor,
       ],
       stops: const [0.1, 0.3, 0.4],
       begin: const Alignment(-1.0, -0.3),
@@ -504,7 +351,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     height: 16,
                     decoration: _shimmerGradient,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppTheme.spacingMedium),
                   Container(
                     width: 200,
                     height: 32,
@@ -513,7 +360,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ],
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: AppTheme.spacingXLarge),
 
             // Pills Skeleton
             Container(
@@ -524,7 +371,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 itemBuilder: (context, index) {
                   return Container(
                     width: 120,
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    margin: const EdgeInsets.symmetric(horizontal: AppTheme.spacingSmall),
                     decoration: _shimmerGradient.copyWith(
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -532,7 +379,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 },
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppTheme.spacingLarge),
 
             // Card Skeleton
             Container(
@@ -564,14 +411,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         backgroundColor: Colors.transparent,
         title: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
+            constraints: AppTheme.maxWidthConstraint,
             child: Text(
               'Get Knowing',
-              style: GoogleFonts.unna(
-                color: primaryColor,
-                fontSize: 24,
-                fontWeight: FontWeight.w500,
-              ),
+              style: AppTheme.appBarTitleStyle,
             ),
           ),
         ),
@@ -601,43 +444,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Colors.white,
-              Color(0xFFFCEEF5), // Very light pink
-              Color(0xFFE6EEF6), // Light blue-gray
-            ],
-            stops: const [0.0, 0.3, 1.0],
+            colors: AppTheme.backgroundGradientColors,
+            stops: const [0.0, 0.4, 0.8, 1.0],
           ),
         ),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
+            constraints: AppTheme.maxWidthConstraint,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
+              padding: AppTheme.screenPadding,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Show either summary tile or input fields
                   if (_isEditing)
                     _buildInputFields()
                   else
                     _buildTodaySummaryTile(),
 
-                  // Submit Button
                   if (_isEditing) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppTheme.spacingMedium),
                     Container(
                       width: double.infinity,
                       child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.all(16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                        ),
+                        style: AppTheme.elevatedButtonStyle,
                         onPressed: _isLoading ? null : _submitEntry,
                         child: _isLoading
                           ? SizedBox(
@@ -649,17 +478,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             )
                           : Text(
                               'Submit Entry',
-                              style: GoogleFonts.unna(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w500,
-                              ),
+                              style: AppTheme.cardTitleStyle,
                             ),
                       ),
                     ),
                   ],
 
                   if (_recommendation != null || _isLoading) ...[
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppTheme.spacingLarge),
                     
                     if (_isLoading)
                       _buildLoadingSkeleton()
@@ -668,34 +494,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         child: Column(
                           children: [
                             Text(
-                              'CURRENT PHASE (estimated)',
-                              style: phaseHeaderStyle,
+                              "YOUR MESSAGE TODAY",
+                              style: AppTheme.phaseHeaderStyle,
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _recommendation!.currentPhase.toUpperCase(),
-                              style: phaseTextStyle,
-                            ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: AppTheme.spacingSmall),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                              padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingLarge),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 12.0),
+                                padding: const EdgeInsets.symmetric(vertical: AppTheme.spacingMedium),
                                 decoration: BoxDecoration(
                                   border: Border(
-                                    top: BorderSide(color: primaryColor.withOpacity(0.1), width: 1),
-                                    bottom: BorderSide(color: primaryColor.withOpacity(0.1), width: 1),
+                                    top: BorderSide(color: AppTheme.primaryColor.withOpacity(0.1), width: 1),
+                                    bottom: BorderSide(color: AppTheme.primaryColor.withOpacity(0.1), width: 1),
                                   ),
                                 ),
                                 child: Text(
                                   _recommendation!.poeticMessage,
-                                  style: GoogleFonts.unna(
-                                    fontSize: 16,
-                                    fontStyle: FontStyle.italic,
-                                    color: primaryColor,
-                                    height: 1.6,
-                                    letterSpacing: 0.5,
-                                  ),
+                                  style: AppTheme.poeticMessageStyle,
                                   textAlign: TextAlign.center,
                                 ),
                               ),
@@ -704,7 +519,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ),
                       ),
 
-                    const SizedBox(height: 32),
+                    const SizedBox(height: AppTheme.spacingXLarge),
 
                     _buildRecommendationsSection(),
                   ],
@@ -850,27 +665,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (_todayEntry == null) return SizedBox.shrink();
     
     return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.85),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.3),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 15,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
+          decoration: AppTheme.glassCardDecoration,
           child: Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: AppTheme.glassCardPadding,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -879,50 +680,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   children: [
                     Text(
                       "Your day",
-                      style: GoogleFonts.unna(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: primaryColor,
-                        letterSpacing: 1.2,
-                      ),
+                      style: AppTheme.cardTitleStyle,
                     ),
                     TextButton.icon(
                       onPressed: _handleEditTap,
-                      icon: const Icon(Icons.edit, color: secondaryColor, size: 20),
+                      icon: const Icon(Icons.edit, color: AppTheme.secondaryColor, size: 20),
                       label: Text(
                         'Edit',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: secondaryColor,
-                        ),
+                        style: AppTheme.tagValueStyle,
                       ),
                     ),
                   ],
                 ),
                 if (_todayEntry!.notes.isNotEmpty) ...[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppTheme.spacingMedium),
                   Text(
                     _todayEntry!.notes,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: primaryColor.withOpacity(0.8),
-                      height: 1.5,
-                    ),
+                    style: AppTheme.cardBodyStyle,
                   ),
                 ],
                 if (_todayEntry!.energyLevel > 0 || _todayEntry!.sleepQualityIndex > 0 || 
                     _todayEntry!.nutrition.isNotEmpty || _todayEntry!.exercise.isNotEmpty || 
                     _todayEntry!.emotion.isNotEmpty || _todayEntry!.symptoms.isNotEmpty ||
                     _todayEntry!.stressors.isNotEmpty) ...[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppTheme.spacingMedium),
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                    spacing: AppTheme.spacingSmall,
+                    runSpacing: AppTheme.spacingSmall,
                     children: [
                       if (_todayEntry!.energyLevel > 0)
                         _buildTag('Energy', '${_todayEntry!.energyLevel.round()}%'),
                       if (_todayEntry!.sleepQualityIndex > 0)
-                        _buildTag('Sleep', _getSleepQualityText(_todayEntry!.sleepQualityIndex)),
+                        _buildTag('Sleep', _getSleepQualityText(_todayEntry!.sleepQualityIndex), entry: _todayEntry),
                       if (_todayEntry!.nutrition.isNotEmpty)
                         _buildTag('Nutrition', _todayEntry!.nutrition, entry: _todayEntry),
                       if (_todayEntry!.exercise.isNotEmpty)
@@ -933,6 +722,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         _buildTag('Symptoms', _todayEntry!.symptoms),
                       if (_todayEntry!.stressors.isNotEmpty)
                         _buildTag('Stressors', '${_todayEntry!.stressors.length} selected'),
+                      if (_recommendation != null)
+                        _buildTag('Phase', _recommendation!.currentPhase.toUpperCase()),
                     ],
                   ),
                 ],
@@ -983,29 +774,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           content: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Today's Log", style: titleStyle),
-              const SizedBox(height: 12),
+              Text("Today's Log", style: AppTheme.titleStyle),
+              const SizedBox(height: AppTheme.spacingMedium),
               TextField(
                 controller: _journalController,
                 maxLines: 5,
-                decoration: InputDecoration(
+                decoration: AppTheme.textFieldDecoration.copyWith(
                   hintText: 'How are you today?',
-                  hintStyle: subtitleStyle,
-                  border: const OutlineInputBorder(
-                    borderSide: BorderSide(color: borderColor),
-                  ),
-                  enabledBorder: const OutlineInputBorder(
-                    borderSide: BorderSide(color: borderColor),
-                  ),
-                  focusedBorder: const OutlineInputBorder(
-                    borderSide: BorderSide(color: primaryColor),
-                  ),
+                  hintStyle: AppTheme.subtitleStyle,
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppTheme.spacingMedium),
         _buildInfoCard(
           title: 'Last Period Start Date',
           content: ListTile(
@@ -1014,9 +796,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               _lastPeriodDate != null
                   ? '${_lastPeriodDate!.day}/${_lastPeriodDate!.month}/${_lastPeriodDate!.year}'
                   : 'Not set',
-              style: subtitleStyle,
+              style: AppTheme.subtitleStyle,
             ),
-            trailing: const Icon(Icons.calendar_today, color: secondaryColor),
+            trailing: const Icon(Icons.calendar_today, color: AppTheme.secondaryColor),
             onTap: () async {
               final DateTime? picked = await showDatePicker(
                 context: context,
@@ -1027,10 +809,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   return Theme(
                     data: Theme.of(context).copyWith(
                       colorScheme: const ColorScheme.light(
-                        primary: primaryColor,
+                        primary: AppTheme.primaryColor,
                         onPrimary: Colors.white,
-                        surface: surfaceColor,
-                        onSurface: primaryColor,
+                        surface: AppTheme.surfaceColor,
+                        onSurface: AppTheme.primaryColor,
                       ),
                     ),
                     child: child!,
@@ -1055,19 +837,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     required double? recommendedValue,
     required bool isExerciseStress,
   }) {
-    if (currentValue == null || recommendedValue == null) return statusRed;
+    if (currentValue == null || recommendedValue == null) return AppTheme.statusRed;
     
     if (isExerciseStress) {
       // For exercise stress, lower is better
-      if (currentValue <= 6) return statusBlue;
-      if (currentValue <= 8) return statusYellow;
-      return statusRed;
+      if (currentValue <= 6) return AppTheme.statusBlue;
+      if (currentValue <= 8) return AppTheme.statusYellow;
+      return AppTheme.statusRed;
     } else {
       // For fiber and protein, higher is better
       final percentage = (currentValue / recommendedValue) * 100;
-      if (percentage >= 100) return statusGreen;
-      if (percentage >= 80) return statusBlue;
-      return statusRed;
+      if (percentage >= 100) return AppTheme.statusGreen;
+      if (percentage >= 80) return AppTheme.statusBlue;
+      return AppTheme.statusRed;
+    }
+  }
+
+  Color _getSleepQualityColor(int index) {
+    switch (index) {
+      case 0: return AppTheme.statusRed;    // Poor
+      case 1: return AppTheme.statusYellow; // Barely
+      case 2: return AppTheme.statusBlue;   // Fair
+      case 3: return AppTheme.statusGreen;  // Good
+      case 4: return AppTheme.statusGreen;  // Great
+      default: return AppTheme.statusRed;
     }
   }
 
@@ -1083,8 +876,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildTag(String label, String value, {JournalEntry? entry}) {
-    // For nutrition tag, show fiber and protein content
-    String displayValue = value;
     List<Widget> children = [];
 
     if (label == 'Nutrition' && entry != null) {
@@ -1103,28 +894,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         children = [
           Text(
             '$label: ',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
-            ),
+            style: AppTheme.tagLabelStyle,
           ),
           Text(
             'Fiber: ${entry.fiberGrams?.toStringAsFixed(1) ?? '0'}g',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-              color: Colors.grey[800],
-            ),
+            style: AppTheme.tagValueStyle,
           ),
           _buildStatusIndicator(fiberColor),
           Text(
             ', Protein: ${entry.proteinGrams?.toStringAsFixed(1) ?? '0'}g',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-              color: Colors.grey[800],
-            ),
+            style: AppTheme.tagValueStyle,
           ),
           _buildStatusIndicator(proteinColor),
         ];
@@ -1132,55 +911,49 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } else if (label == 'Exercise' && entry?.bodyStressLevel != null) {
       final stressColor = _getStatusColor(
         currentValue: entry!.bodyStressLevel,
-        recommendedValue: 6, // Using 6 as the threshold for moderate stress
+        recommendedValue: 6,
         isExerciseStress: true,
       );
       children = [
         Text(
           '$label: ',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w500,
-          ),
+          style: AppTheme.tagLabelStyle,
         ),
         Text(
-          '$value (Stress: ${entry.bodyStressLevel!.toStringAsFixed(1)}/10)',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w400,
-            color: Colors.grey[800],
-          ),
+          'Stress: ${entry.bodyStressLevel!.toStringAsFixed(1)}/10',
+          style: AppTheme.tagValueStyle,
         ),
         _buildStatusIndicator(stressColor),
+      ];
+    } else if (label == 'Sleep' && entry != null) {
+      final sleepColor = _getSleepQualityColor(entry.sleepQualityIndex);
+      children = [
+        Text(
+          '$label: ',
+          style: AppTheme.tagLabelStyle,
+        ),
+        Text(
+          value,
+          style: AppTheme.tagValueStyle,
+        ),
+        _buildStatusIndicator(sleepColor),
       ];
     } else {
       children = [
         Text(
           '$label: ',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w500,
-          ),
+          style: AppTheme.tagLabelStyle,
         ),
         Text(
           value,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w400,
-            color: Colors.grey[800],
-          ),
+          style: AppTheme.tagValueStyle,
         ),
       ];
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-      ),
+      padding: AppTheme.tagPadding,
+      decoration: AppTheme.tagDecoration,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: children,

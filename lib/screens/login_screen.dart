@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/user_service.dart';
 import 'home_screen.dart';
+import '../theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,118 +11,60 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
+  final _loginFormKey = GlobalKey<FormState>();
+  final _registerFormKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _userService = UserService();
+  final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
-  String? _errorMessage;
-  bool _obscurePassword = true;
+  final _userService = UserService();
   late TabController _tabController;
-
-  // Color scheme matching home screen
-  static const Color primaryColor = Color(0xFF2C2C2C);
-  static const Color secondaryColor = Color(0xFF4A4A4A);
-  static const Color surfaceColor = Color(0xFFF5F5F5);
-  static const Color borderColor = Color(0xFFE0E0E0);
-  static const Color backgroundColor = Colors.white;
-  static const Color textColor = Color(0xFF2C2C2C);
-  static const Color subtitleColor = Color(0xFF757575);
-
-  // Text styles matching home screen
-  TextStyle get titleStyle => GoogleFonts.unna(
-    fontSize: 24,
-    fontWeight: FontWeight.bold,
-    color: primaryColor,
-    letterSpacing: 0.15,
-  );
-
-  TextStyle get subtitleStyle => GoogleFonts.unna(
-    fontSize: 18,
-    color: subtitleColor,
-    letterSpacing: 0.15,
-  );
-
-  static final cardDecoration = BoxDecoration(
-    color: backgroundColor,
-    borderRadius: BorderRadius.circular(12),
-    border: Border.all(color: borderColor),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withOpacity(0.05),
-        blurRadius: 4,
-        offset: const Offset(0, 2),
-      ),
-    ],
-  );
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _checkStoredUsername();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
-  Future<void> _checkStoredUsername() async {
-    final storedUsername = _userService.getUsernameFromStorage();
-    if (storedUsername != null) {
-      final userData = await _userService.getUserData(storedUsername);
-      if (userData != null) {
-        if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => HomeScreen(username: storedUsername),
-            ),
-          );
-        }
-      }
-    }
-  }
+  Future<void> _login() async {
+    if (!_loginFormKey.currentState!.validate()) return;
 
-  Future<void> _handleLogin() async {
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text;
-    
-    if (username.isEmpty) {
-      setState(() => _errorMessage = 'Please enter a username');
-      return;
-    }
-    
-    if (password.isEmpty) {
-      setState(() => _errorMessage = 'Please enter a password');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      final success = await _userService.verifyUser(username, password);
-      if (!success) {
-        setState(() => _errorMessage = 'Invalid username or password');
-        setState(() => _isLoading = false);
-        return;
-      }
+      final success = await _userService.login(
+        _usernameController.text,
+        _passwordController.text,
+      );
 
       if (success && mounted) {
-        Navigator.of(context).pushReplacement(
+        Navigator.pushReplacement(
+          context,
           MaterialPageRoute(
-            builder: (context) => HomeScreen(username: username),
+            builder: (context) => HomeScreen(username: _usernameController.text),
           ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid credentials')),
         );
       }
     } catch (e) {
-      setState(() => _errorMessage = 'An error occurred. Please try again.');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -129,213 +72,257 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     }
   }
 
-  Future<void> _handleRegister() async {
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text;
-    
-    if (username.isEmpty) {
-      setState(() => _errorMessage = 'Please enter a username');
-      return;
-    }
-    
-    if (password.isEmpty) {
-      setState(() => _errorMessage = 'Please enter a password');
-      return;
-    }
+  Future<void> _register() async {
+    if (!_registerFormKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      final success = await _userService.registerUsername(username, password);
-      if (!success) {
-        setState(() => _errorMessage = 'Username already taken');
-        setState(() => _isLoading = false);
-        return;
-      }
+      final success = await _userService.registerUsername(
+        _usernameController.text,
+        _passwordController.text,
+      );
 
       if (success && mounted) {
-        Navigator.of(context).pushReplacement(
+        Navigator.pushReplacement(
+          context,
           MaterialPageRoute(
-            builder: (context) => HomeScreen(username: username),
+            builder: (context) => HomeScreen(username: _usernameController.text),
           ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Registration failed')),
         );
       }
     } catch (e) {
-      setState(() => _errorMessage = 'An error occurred. Please try again.');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
-  }
-
-  Widget _buildForm(bool isLogin) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          controller: _usernameController,
-          decoration: InputDecoration(
-            labelText: 'Username',
-            labelStyle: subtitleStyle,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: borderColor),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: borderColor),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: primaryColor),
-            ),
-            errorText: _errorMessage,
-            errorStyle: TextStyle(
-              color: Colors.red[700],
-              fontSize: 12,
-            ),
-          ),
-          enabled: !_isLoading,
-          style: subtitleStyle,
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _passwordController,
-          obscureText: _obscurePassword,
-          decoration: InputDecoration(
-            labelText: 'Password',
-            labelStyle: subtitleStyle,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: borderColor),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: borderColor),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: primaryColor),
-            ),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                color: subtitleColor,
-              ),
-              onPressed: () {
-                setState(() {
-                  _obscurePassword = !_obscurePassword;
-                });
-              },
-            ),
-          ),
-          enabled: !_isLoading,
-          style: subtitleStyle,
-        ),
-        const SizedBox(height: 24),
-        ElevatedButton(
-          onPressed: _isLoading ? null : (isLogin ? _handleLogin : _handleRegister),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: primaryColor,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.all(16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            elevation: 0,
-          ),
-          child: _isLoading
-              ? SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : Text(
-                  isLogin ? 'Login' : 'Register',
-                  style: GoogleFonts.unna(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-        ),
-      ],
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        backgroundColor: backgroundColor,
-        title: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: Text(
-              'Welcome to Knowing',
-              style: GoogleFonts.unna(
-                color: primaryColor,
-                fontSize: 24,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: AppTheme.backgroundGradientColors,
+            stops: const [0.0, 0.4, 0.8, 1.0],
           ),
         ),
-        elevation: 0,
-      ),
-      body: Center(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: AppTheme.maxFormWidthConstraint,
         child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
+              padding: AppTheme.screenPadding,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Know your body, know your lifestyle',
-                  style: subtitleStyle,
-                ),
-                const SizedBox(height: 32),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 480),
-                  child: Container(
-                    decoration: cardDecoration,
-                    padding: const EdgeInsets.all(24),
+                    'Welcome to Knowing',
+                    style: AppTheme.titleStyle,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppTheme.spacingXLarge),
+                  Container(
+                    decoration: AppTheme.glassCardDecoration,
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         TabBar(
                           controller: _tabController,
-                          labelColor: primaryColor,
-                          unselectedLabelColor: subtitleColor,
-                          indicatorColor: primaryColor,
-                          indicatorWeight: 2,
                           tabs: const [
                             Tab(text: 'Login'),
                             Tab(text: 'Register'),
                           ],
+                          labelColor: AppTheme.secondaryColor,
+                          unselectedLabelColor: Colors.grey,
+                          indicatorColor: AppTheme.secondaryColor,
+                          labelStyle: AppTheme.cardTitleStyle,
+                          unselectedLabelStyle: AppTheme.cardTitleStyle,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          indicatorSize: TabBarIndicatorSize.label,
+                          indicatorWeight: 3,
+                          dividerColor: Colors.transparent,
+                          splashBorderRadius: BorderRadius.circular(8),
+                          overlayColor: MaterialStateProperty.all(
+                            AppTheme.secondaryColor.withOpacity(0.1),
+                          ),
                         ),
-                        const SizedBox(height: 24),
                         SizedBox(
-                          height: 300,
+                          height: 400,
                           child: TabBarView(
                             controller: _tabController,
                             children: [
-                              _buildForm(true),
-                              _buildForm(false),
+                              // Login Tab
+                              Form(
+                                key: _loginFormKey,
+                                child: Padding(
+                                  padding: AppTheme.glassCardPadding,
+                                  child: Column(
+                                    children: [
+                                      TextFormField(
+                                        controller: _usernameController,
+                                        decoration: AppTheme.textFieldDecoration.copyWith(
+                                          labelText: 'Username',
+                                          labelStyle: AppTheme.poeticMessageStyle,
+                                          prefixIcon: const Icon(Icons.person, color: AppTheme.secondaryColor),
+                                        ),
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'Please enter your username';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: AppTheme.spacingMedium),
+                                      TextFormField(
+                                        controller: _passwordController,
+                                        decoration: AppTheme.textFieldDecoration.copyWith(
+                                          labelText: 'Password',
+                                          labelStyle: AppTheme.poeticMessageStyle,
+                                          prefixIcon: const Icon(Icons.lock, color: AppTheme.secondaryColor),
+                                        ),
+                                        obscureText: true,
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'Please enter your password';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: AppTheme.spacingLarge),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton(
+                                          style: AppTheme.elevatedButtonStyle,
+                                          onPressed: _isLoading ? null : _login,
+                                          child: _isLoading
+                                            ? SizedBox(
+                                                height: 24,
+                                                width: 24,
+                                                child: CircularProgressIndicator(
+                                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                ),
+                                              )
+                                            : Text(
+                                                'Login',
+                                                style: AppTheme.cardTitleStyle.copyWith(
+                                                  color: Colors.white,
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              // Register Tab
+                              Form(
+                                key: _registerFormKey,
+                                child: Padding(
+                                  padding: AppTheme.glassCardPadding,
+                                  child: Column(
+                                    children: [
+                                      TextFormField(
+                                        controller: _usernameController,
+                                        decoration: AppTheme.textFieldDecoration.copyWith(
+                                          labelText: 'Username',
+                                          labelStyle: AppTheme.poeticMessageStyle,
+                                          prefixIcon: const Icon(Icons.person, color: AppTheme.secondaryColor),
+                                        ),
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'Please enter a username';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: AppTheme.spacingMedium),
+                                      TextFormField(
+                                        controller: _passwordController,
+                                        decoration: AppTheme.textFieldDecoration.copyWith(
+                                          labelText: 'Password',
+                                          labelStyle: AppTheme.poeticMessageStyle,
+                                          prefixIcon: const Icon(Icons.lock, color: AppTheme.secondaryColor),
+                                        ),
+                                        obscureText: true,
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'Please enter a password';
+                                          }
+                                          if (value.length < 6) {
+                                            return 'Password must be at least 6 characters';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: AppTheme.spacingMedium),
+                                      TextFormField(
+                                        controller: _confirmPasswordController,
+                                        decoration: AppTheme.textFieldDecoration.copyWith(
+                                          labelText: 'Confirm Password',
+                                          labelStyle: AppTheme.poeticMessageStyle,
+                                          prefixIcon: const Icon(Icons.lock, color: AppTheme.secondaryColor),
+                                        ),
+                                        obscureText: true,
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'Please confirm your password';
+                                          }
+                                          if (value != _passwordController.text) {
+                                            return 'Passwords do not match';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: AppTheme.spacingLarge),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton(
+                                          style: AppTheme.elevatedButtonStyle,
+                                          onPressed: _isLoading ? null : _register,
+                                          child: _isLoading
+                                            ? SizedBox(
+                                                height: 24,
+                                                width: 24,
+                                                child: CircularProgressIndicator(
+                                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                ),
+                                              )
+                                            : Text(
+                                                'Register',
+                                                style: AppTheme.cardTitleStyle.copyWith(
+                                                  color: Colors.white,
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),
                       ],
                     ),
                   ),
+                ],
                 ),
-              ],
             ),
           ),
         ),

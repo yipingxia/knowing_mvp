@@ -7,6 +7,7 @@ import '../services/daily_log_service.dart';
 import 'interactive_input.dart';
 import '../services/user_info_service.dart';
 import '../models/user_info.dart';
+import '../theme/app_theme.dart';
 
 class JournalEntriesListScreen extends StatefulWidget {
   const JournalEntriesListScreen({super.key});
@@ -72,66 +73,124 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: Text(
-          'Journal Entries',
-          style: GoogleFonts.unna(
-            color: Colors.black,
-            fontSize: 24,
-            fontWeight: FontWeight.w500,
+        backgroundColor: Colors.transparent,
+        title: Center(
+          child: ConstrainedBox(
+            constraints: AppTheme.maxWidthConstraint,
+            child: Text(
+              'Journal Entries',
+              style: AppTheme.appBarTitleStyle,
+            ),
           ),
         ),
-        backgroundColor: Colors.transparent,
         elevation: 0,
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.black),
       ),
-      body: StreamBuilder<List<JournalEntry>>(
-        stream: _dailyLogService.getAllLogs(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: AppTheme.backgroundGradientColors,
+            stops: const [0.0, 0.4, 0.8, 1.0],
+          ),
+        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: AppTheme.maxWidthConstraint,
+            child: StreamBuilder<List<JournalEntry>>(
+              stream: _dailyLogService.getAllLogs(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
 
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-          final entries = snapshot.data ?? [];
+                final entries = snapshot.data ?? [];
 
-          if (entries.isEmpty) {
-            return Center(
-              child: Text(
-                'No entries yet. Add your first entry!',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 16,
-                ),
-              ),
-            );
-          }
+                if (entries.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'No entries yet. Add your first entry!',
+                      style: AppTheme.subtitleStyle,
+                    ),
+                  );
+                }
 
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              final isWideScreen = constraints.maxWidth > 600;
-              return GridView.builder(
-                padding: const EdgeInsets.all(24),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: isWideScreen ? 2 : 1,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: isWideScreen ? 0.85 : 0.7,
-                ),
-                itemCount: entries.length,
-                itemBuilder: (context, index) {
-                  final entry = entries[index];
-                  return _buildEntryTile(context, entry);
-                },
-              );
-            },
-          );
-        },
+                return GridView.builder(
+                  padding: AppTheme.screenPadding,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 0.8,
+                    crossAxisSpacing: AppTheme.spacingMedium,
+                    mainAxisSpacing: AppTheme.spacingMedium,
+                  ),
+                  itemCount: entries.length,
+                  itemBuilder: (context, index) {
+                    final entry = entries[index];
+                    return Container(
+                      decoration: AppTheme.entryTileDecoration,
+                      child: InkWell(
+                        onTap: () => _addOrUpdateEntry(entry.date, entry),
+                        child: Padding(
+                          padding: AppTheme.cardPadding,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _formatDate(entry.date),
+                                style: AppTheme.dateStyle,
+                              ),
+                              if (entry.notes.isNotEmpty) ...[
+                                const SizedBox(height: AppTheme.spacingSmall),
+                                Text(
+                                  entry.notes,
+                                  style: AppTheme.cardBodyStyle,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                              if (entry.energyLevel > 0 || entry.sleepQualityIndex > 0 || 
+                                  entry.nutrition.isNotEmpty || entry.exercise.isNotEmpty || 
+                                  entry.emotion.isNotEmpty || entry.symptoms.isNotEmpty ||
+                                  entry.stressors.isNotEmpty) ...[
+                                const SizedBox(height: AppTheme.spacingMedium),
+                                Wrap(
+                                  spacing: AppTheme.spacingSmall,
+                                  runSpacing: AppTheme.spacingSmall,
+                                  children: [
+                                    if (entry.energyLevel > 0)
+                                      _buildTag('Energy', '${entry.energyLevel.round()}%', entry: entry),
+                                    if (entry.sleepQualityIndex > 0)
+                                      _buildTag('Sleep', _getSleepQualityText(entry.sleepQualityIndex), entry: entry),
+                                    if (entry.nutrition.isNotEmpty)
+                                      _buildTag('Nutrition', entry.nutrition, entry: entry),
+                                    if (entry.exercise.isNotEmpty)
+                                      _buildTag('Exercise', entry.exercise, entry: entry),
+                                    if (entry.emotion.isNotEmpty)
+                                      _buildTag('Emotion', entry.emotion, entry: entry),
+                                    if (entry.symptoms.isNotEmpty)
+                                      _buildTag('Symptoms', entry.symptoms, entry: entry),
+                                    if (entry.stressors.isNotEmpty)
+                                      _buildTag('Stressors', '${entry.stressors.length} selected', entry: entry),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _addOrUpdateEntry(DateTime.now()),
@@ -141,156 +200,11 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
     );
   }
 
-  Widget _buildEntryTile(BuildContext context, JournalEntry entry) {
-    return InkWell(
-      onTap: () => _addOrUpdateEntry(entry.date, entry),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey[300]!),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              DateFormat.MMMd().format(entry.date),
-              style: GoogleFonts.unna(
-                fontSize: 20,
-                fontWeight: FontWeight.w300,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              entry.phase,
-              style: GoogleFonts.unna(
-                fontSize: 24,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                _buildStatItem('Energy', '${entry.energyLevel.round()}%'),
-                const SizedBox(width: 16),
-                _buildStatItem('Sleep', _getSleepQualityText(entry.sleepQualityIndex)),
-              ],
-            ),
-            if (entry.nutrition.isNotEmpty || entry.exercise.isNotEmpty || 
-                entry.emotion.isNotEmpty || entry.symptoms.isNotEmpty ||
-                entry.stressors.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              const Divider(height: 1),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (entry.nutrition.isNotEmpty)
-                    _buildTag('Nutrition', entry.nutrition, entry: entry),
-                  if (entry.exercise.isNotEmpty)
-                    _buildTag('Exercise', entry.exercise, entry: entry),
-                  if (entry.emotion.isNotEmpty)
-                    _buildTag('Emotion', entry.emotion),
-                  if (entry.symptoms.isNotEmpty)
-                    _buildTag('Symptoms', entry.symptoms),
-                  if (entry.stressors.isNotEmpty)
-                    _buildTag('Stressors', '${entry.stressors.length} selected'),
-                ],
-              ),
-            ],
-            if (entry.notes.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                entry.notes,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatItem(String label, String value) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w300,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _getSleepQualityText(int index) {
-    final qualities = ['Poor', 'Barely', 'Fair', 'Good', 'Great'];
-    return qualities[index];
-  }
-
-  // Add these color constants at the top of the class
-  static const Color statusBlue = Color(0xFF2196F3);
-  static const Color statusGreen = Color(0xFF4CAF50);
-  static const Color statusRed = Color(0xFFF44336);
-  static const Color statusYellow = Color(0xFFFFC107);
-
-  // Add this helper function
-  Color _getStatusColor({
-    required double? currentValue,
-    required double? recommendedValue,
-    required bool isExerciseStress,
-  }) {
-    if (currentValue == null || recommendedValue == null) return statusRed;
-    
-    if (isExerciseStress) {
-      // For exercise stress, lower is better
-      if (currentValue <= 6) return statusBlue;
-      if (currentValue <= 8) return statusYellow;
-      return statusRed;
-    } else {
-      // For fiber and protein, higher is better
-      final percentage = (currentValue / recommendedValue) * 100;
-      if (percentage >= 100) return statusGreen;
-      if (percentage >= 80) return statusBlue;
-      return statusRed;
-    }
-  }
-
-  // Add this widget class before _buildTag
-  Widget _buildStatusIndicator(Color color) {
-    return Text(
-      ' ●',
-      style: TextStyle(
-        color: color,
-        fontSize: 14,
-      ),
-    );
+  String _formatDate(DateTime date) {
+    return DateFormat('MMM dd').format(date);
   }
 
   Widget _buildTag(String label, String value, {JournalEntry? entry}) {
-    // For nutrition tag, show fiber and protein content
-    String displayValue = value;
     List<Widget> children = [];
 
     if (label == 'Nutrition' && entry != null) {
@@ -309,28 +223,16 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
         children = [
           Text(
             '$label: ',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w400,
-            ),
+            style: AppTheme.tagLabelStyle,
           ),
           Text(
             'Fiber: ${entry.fiberGrams?.toStringAsFixed(1) ?? '0'}g',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-              color: Colors.grey[800],
-            ),
+            style: AppTheme.tagValueStyle,
           ),
           _buildStatusIndicator(fiberColor),
           Text(
             ', Protein: ${entry.proteinGrams?.toStringAsFixed(1) ?? '0'}g',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-              color: Colors.grey[800],
-            ),
+            style: AppTheme.tagValueStyle,
           ),
           _buildStatusIndicator(proteinColor),
         ];
@@ -338,58 +240,101 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
     } else if (label == 'Exercise' && entry?.bodyStressLevel != null) {
       final stressColor = _getStatusColor(
         currentValue: entry!.bodyStressLevel,
-        recommendedValue: 6, // Using 6 as the threshold for moderate stress
+        recommendedValue: 6,
         isExerciseStress: true,
       );
       children = [
         Text(
           '$label: ',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w400,
-          ),
+          style: AppTheme.tagLabelStyle,
         ),
         Text(
-          '$value (Stress: ${entry.bodyStressLevel!.toStringAsFixed(1)}/10)',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w400,
-            color: Colors.grey[800],
-          ),
+          'Stress: ${entry.bodyStressLevel!.toStringAsFixed(1)}/10',
+          style: AppTheme.tagValueStyle,
         ),
         _buildStatusIndicator(stressColor),
+      ];
+    } else if (label == 'Sleep' && entry != null) {
+      final sleepColor = _getSleepQualityColor(entry.sleepQualityIndex);
+      children = [
+        Text(
+          '$label: ',
+          style: AppTheme.tagLabelStyle,
+        ),
+        Text(
+          value,
+          style: AppTheme.tagValueStyle,
+        ),
+        _buildStatusIndicator(sleepColor),
       ];
     } else {
       children = [
         Text(
           '$label: ',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w400,
-          ),
+          style: AppTheme.tagLabelStyle,
         ),
         Text(
           value,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w400,
-            color: Colors.grey[800],
-          ),
+          style: AppTheme.tagValueStyle,
         ),
       ];
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-      ),
+      padding: AppTheme.tagPadding,
+      decoration: AppTheme.tagDecoration,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: children,
+      ),
+    );
+  }
+
+  String _getSleepQualityText(int index) {
+    final qualities = ['Poor', 'Barely', 'Fair', 'Good', 'Great'];
+    return qualities[index];
+  }
+
+  // Add this helper function
+  Color _getStatusColor({
+    required double? currentValue,
+    required double? recommendedValue,
+    required bool isExerciseStress,
+  }) {
+    if (currentValue == null || recommendedValue == null) return AppTheme.statusRed;
+    
+    if (isExerciseStress) {
+      // For exercise stress, lower is better
+      if (currentValue <= 6) return AppTheme.statusBlue;
+      if (currentValue <= 8) return AppTheme.statusYellow;
+      return AppTheme.statusRed;
+    } else {
+      // For fiber and protein, higher is better
+      final percentage = (currentValue / recommendedValue) * 100;
+      if (percentage >= 100) return AppTheme.statusGreen;
+      if (percentage >= 80) return AppTheme.statusBlue;
+      return AppTheme.statusRed;
+    }
+  }
+
+  Color _getSleepQualityColor(int index) {
+    switch (index) {
+      case 0: return AppTheme.statusRed;    // Poor
+      case 1: return AppTheme.statusYellow; // Barely
+      case 2: return AppTheme.statusBlue;   // Fair
+      case 3: return AppTheme.statusGreen;  // Good
+      case 4: return AppTheme.statusGreen;  // Great
+      default: return AppTheme.statusRed;
+    }
+  }
+
+  // Add this widget class before _buildTag
+  Widget _buildStatusIndicator(Color color) {
+    return Text(
+      ' ●',
+      style: TextStyle(
+        color: color,
+        fontSize: 14,
       ),
     );
   }
