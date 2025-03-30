@@ -13,6 +13,9 @@ import '../services/recommendations_service.dart';
 import '../services/user_service.dart';
 import 'login_screen.dart';
 import 'package:flutter/rendering.dart';
+import 'user_info_screen.dart';
+import '../services/user_info_service.dart';
+import '../models/user_info.dart';
 
 class HomeScreen extends StatefulWidget {
   final String username;
@@ -99,6 +102,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   JournalEntry? _todayEntry;
   late final UserService _userService;
   int _currentPage = 0;
+  final UserInfoService _userInfoService = UserInfoService(FirebaseFirestore.instance);
+  UserInfo? _userInfo;
+
+  // Add these color constants at the top of the class with other constants
+  static const Color statusBlue = Color(0xFF2196F3);
+  static const Color statusGreen = Color(0xFF4CAF50);
+  static const Color statusRed = Color(0xFFF44336);
+  static const Color statusYellow = Color(0xFFFFC107);
 
   _HomeScreenState()
       : _dailyLogService = DailyLogService(FirebaseFirestore.instance),
@@ -139,6 +150,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     // Load today's data
     _loadTodayData();
+
+    // Load user info
+    _loadUserInfo();
   }
 
   Future<void> _loadTodayData() async {
@@ -218,6 +232,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           SnackBar(content: Text('Error loading today\'s data: $e')),
         );
       }
+    }
+  }
+
+  Future<void> _loadUserInfo() async {
+    try {
+      final userInfo = await _userInfoService.getUserInfo();
+      if (mounted) {
+        setState(() {
+          _userInfo = userInfo;
+        });
+      }
+    } catch (e) {
+      print('Error loading user info: $e');
     }
   }
 
@@ -550,6 +577,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const UserInfoScreen(),
+                ),
+              );
+            },
+            tooltip: 'Profile',
+          ),
+          IconButton(
             icon: const Icon(Icons.add_chart),
             onPressed: _navigateToJournalEntries,
             tooltip: 'Journal Entries',
@@ -560,15 +599,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
             colors: [
               Colors.white,
-              Colors.blue.shade50,
-              Colors.purple.shade50,
-              Colors.pink.shade50,
+              Color(0xFFFCEEF5), // Very light pink
+              Color(0xFFE6EEF6), // Light blue-gray
             ],
-            stops: const [0.0, 0.3, 0.7, 1.0],
+            stops: const [0.0, 0.3, 1.0],
           ),
         ),
         child: Center(
@@ -1011,19 +1049,130 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // Add the _buildTag method
+  // Add this helper function
+  Color _getStatusColor({
+    required double? currentValue,
+    required double? recommendedValue,
+    required bool isExerciseStress,
+  }) {
+    if (currentValue == null || recommendedValue == null) return statusRed;
+    
+    if (isExerciseStress) {
+      // For exercise stress, lower is better
+      if (currentValue <= 6) return statusBlue;
+      if (currentValue <= 8) return statusYellow;
+      return statusRed;
+    } else {
+      // For fiber and protein, higher is better
+      final percentage = (currentValue / recommendedValue) * 100;
+      if (percentage >= 100) return statusGreen;
+      if (percentage >= 80) return statusBlue;
+      return statusRed;
+    }
+  }
+
+  // Add this widget class before _buildTag
+  Widget _buildStatusIndicator(Color color) {
+    return Text(
+      ' ●',
+      style: TextStyle(
+        color: color,
+        fontSize: 14,
+      ),
+    );
+  }
+
   Widget _buildTag(String label, String value, {JournalEntry? entry}) {
     // For nutrition tag, show fiber and protein content
     String displayValue = value;
+    List<Widget> children = [];
+
     if (label == 'Nutrition' && entry != null) {
       if (entry.fiberGrams != null || entry.proteinGrams != null) {
-        displayValue = 'Fiber: ${entry.fiberGrams?.toStringAsFixed(1) ?? '0'}g, '
-                      'Protein: ${entry.proteinGrams?.toStringAsFixed(1) ?? '0'}g';
+        final fiberColor = _getStatusColor(
+          currentValue: entry.fiberGrams,
+          recommendedValue: _userInfo?.recommendedFiberIntake,
+          isExerciseStress: false,
+        );
+        final proteinColor = _getStatusColor(
+          currentValue: entry.proteinGrams,
+          recommendedValue: _userInfo?.recommendedProteinIntake,
+          isExerciseStress: false,
+        );
+        
+        children = [
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Text(
+            'Fiber: ${entry.fiberGrams?.toStringAsFixed(1) ?? '0'}g',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+              color: Colors.grey[800],
+            ),
+          ),
+          _buildStatusIndicator(fiberColor),
+          Text(
+            ', Protein: ${entry.proteinGrams?.toStringAsFixed(1) ?? '0'}g',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+              color: Colors.grey[800],
+            ),
+          ),
+          _buildStatusIndicator(proteinColor),
+        ];
       }
-    }
-    // For exercise tag, show body stress level if available
-    if (label == 'Exercise' && entry?.bodyStressLevel != null) {
-      displayValue = '$value (Stress: ${entry!.bodyStressLevel!.toStringAsFixed(1)}/10)';
+    } else if (label == 'Exercise' && entry?.bodyStressLevel != null) {
+      final stressColor = _getStatusColor(
+        currentValue: entry!.bodyStressLevel,
+        recommendedValue: 6, // Using 6 as the threshold for moderate stress
+        isExerciseStress: true,
+      );
+      children = [
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Text(
+          '$value (Stress: ${entry.bodyStressLevel!.toStringAsFixed(1)}/10)',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+            color: Colors.grey[800],
+          ),
+        ),
+        _buildStatusIndicator(stressColor),
+      ];
+    } else {
+      children = [
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+            color: Colors.grey[800],
+          ),
+        ),
+      ];
     }
 
     return Container(
@@ -1034,25 +1183,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '$label: ',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          Text(
-            displayValue,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+        children: children,
       ),
     );
   }
