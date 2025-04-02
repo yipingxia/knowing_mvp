@@ -3,11 +3,19 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_info.dart';
 import '../services/user_info_service.dart';
+import '../services/user_service.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import '../screens/home_screen.dart';
+import '../screens/login_screen.dart';
 
 class UserInfoScreen extends StatefulWidget {
-  const UserInfoScreen({super.key});
+  final bool forceEdit;
+  
+  const UserInfoScreen({
+    super.key,
+    this.forceEdit = false,
+  });
 
   @override
   State<UserInfoScreen> createState() => _UserInfoScreenState();
@@ -15,14 +23,15 @@ class UserInfoScreen extends StatefulWidget {
 
 class _UserInfoScreenState extends State<UserInfoScreen> {
   final UserInfoService _userInfoService = UserInfoService(FirebaseFirestore.instance);
+  final UserService _userService = UserService();
   UserInfo? _userInfo;
   bool _isLoading = true;
   bool _isEditing = false;
-  Gender _selectedGender = Gender.female;
-  int _height = 165; // Default height
-  int _weight = 60; // Default weight
-  DateTime _birthDate = DateTime.now().subtract(const Duration(days: 365 * 25)); // Default age 25
-  ActivityLevel _activityLevel = ActivityLevel.sedentary;
+  Gender? _selectedGender;
+  int? _height;
+  int? _weight;
+  DateTime? _birthDate;
+  ActivityLevel? _activityLevel;
   
   // Color scheme
   static const Color primaryColor = Color(0xFF2C2C2C);
@@ -48,14 +57,37 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
           _birthDate = userInfo.birthDate;
           _activityLevel = userInfo.activityLevel;
           _isLoading = false;
+          _isEditing = widget.forceEdit;
         });
       } else {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _isEditing = widget.forceEdit;
+          // Set default values when in edit mode and no user info exists
+          if (widget.forceEdit) {
+            _selectedGender = Gender.female;
+            _height = 165;
+            _weight = 60;
+            _birthDate = DateTime.now().subtract(const Duration(days: 365 * 25));
+            _activityLevel = ActivityLevel.sedentary;
+          }
+        });
       }
     } catch (e) {
       print('Error loading user info: $e');
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _isEditing = widget.forceEdit;
+          // Set default values when in edit mode and error occurs
+          if (widget.forceEdit) {
+            _selectedGender = Gender.female;
+            _height = 165;
+            _weight = 60;
+            _birthDate = DateTime.now().subtract(const Duration(days: 365 * 25));
+            _activityLevel = ActivityLevel.sedentary;
+          }
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading user info: $e')),
         );
@@ -68,11 +100,11 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
       setState(() => _isLoading = true);
 
       final userInfo = UserInfo.create(
-        gender: _selectedGender,
-        height: _height,
-        weight: _weight,
-        birthDate: _birthDate,
-        activityLevel: _activityLevel,
+        gender: _selectedGender!,
+        height: _height!,
+        weight: _weight!,
+        birthDate: _birthDate!,
+        activityLevel: _activityLevel!,
       );
 
       await _userInfoService.saveUserInfo(userInfo);
@@ -81,6 +113,19 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
           _isEditing = false;
           _isLoading = false;
         });
+
+        // If this is a new user (forceEdit mode), navigate to home screen
+        if (widget.forceEdit) {
+          final username = _userService.getUsernameFromStorage();
+          if (username != null) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomeScreen(username: username),
+              ),
+            );
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -183,7 +228,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
               ),
             ),
             Text(
-              _getActivityLevelText(_activityLevel),
+              _getActivityLevelText(_activityLevel!),
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
@@ -224,7 +269,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
                           width: 8,
                           height: 40 + (index * 20),
                           decoration: BoxDecoration(
-                            color: index <= _activityLevel.index
+                            color: index <= _activityLevel!.index
                                 ? primaryColor
                                 : surfaceColor,
                             borderRadius: BorderRadius.circular(4),
@@ -248,7 +293,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
                         ),
                       ),
                       child: Slider(
-                        value: _activityLevel.index.toDouble(),
+                        value: _activityLevel!.index.toDouble(),
                         min: 0,
                         max: ActivityLevel.values.length - 1,
                         divisions: ActivityLevel.values.length - 1,
@@ -272,7 +317,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _birthDate,
+      initialDate: _birthDate!,
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
       builder: (context, child) {
@@ -302,13 +347,12 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: Center(
-          child: ConstrainedBox(
-            constraints: AppTheme.maxWidthConstraint,
-            child: Text(
-              'User Information',
-              style: AppTheme.appBarTitleStyle,
-            ),
+        centerTitle: true,
+        title: ConstrainedBox(
+          constraints: AppTheme.maxWidthConstraint,
+          child: Text(
+            'User Information',
+            style: AppTheme.appBarTitleStyle,
           ),
         ),
         elevation: 0,
@@ -354,46 +398,250 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
                           ],
                         ),
                         const SizedBox(height: AppTheme.spacingMedium),
-                        GridView.count(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisCount: 2,
-                          mainAxisSpacing: AppTheme.spacingMedium,
-                          crossAxisSpacing: AppTheme.spacingMedium,
-                          childAspectRatio: 1.0,
-                          children: [
-                            _buildSummaryCard(
-                              'Gender',
-                              _userInfo?.gender.toString().split('.').last.capitalize() ?? 'Not set',
-                              Icons.person,
-                            ),
-                            _buildSummaryCard(
-                              'Height',
-                              _userInfo?.height != null ? '${_userInfo!.height} cm' : 'Not set',
-                              Icons.height,
-                            ),
-                            _buildSummaryCard(
-                              'Weight',
-                              _userInfo?.weight != null ? '${_userInfo!.weight} kg' : 'Not set',
-                              Icons.monitor_weight,
-                            ),
-                            _buildSummaryCard(
-                              'Age',
-                              _userInfo?.age != null ? '${_userInfo!.age} years' : 'Not set',
-                              Icons.cake,
-                            ),
-                            _buildSummaryCard(
-                              'Activity Level',
-                              _userInfo?.activityLevel.toString().split('.').last.capitalize() ?? 'Not set',
-                              Icons.directions_run,
-                            ),
-                            _buildSummaryCard(
-                              'Daily Intake',
-                              _userInfo?.recommendedCalories != null ? '${_userInfo!.recommendedCalories.round()} kcal' : 'Not set',
-                              Icons.restaurant,
-                            ),
-                          ],
-                        ),
+                        if (_isEditing)
+                          Column(
+                            children: [
+                              // Gender Selection
+                              Container(
+                                decoration: AppTheme.glassCardDecoration,
+                                padding: AppTheme.glassCardPadding,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Gender', style: AppTheme.tagLabelStyle),
+                                    const SizedBox(height: AppTheme.spacingSmall),
+                                    Row(
+                                      children: Gender.values.map((gender) {
+                                        return Expanded(
+                                          child: RadioListTile<Gender>(
+                                            title: Text(
+                                              gender.toString().split('.').last.capitalize(),
+                                              style: AppTheme.tagValueStyle,
+                                            ),
+                                            value: gender,
+                                            groupValue: _selectedGender,
+                                            onChanged: (Gender? value) {
+                                              if (value != null) {
+                                                setState(() => _selectedGender = value);
+                                              }
+                                            },
+                                          ),
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: AppTheme.spacingMedium),
+
+                              // Height and Weight
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildSliderSection(
+                                      title: 'Height',
+                                      value: _height!,
+                                      min: 140,
+                                      max: 200,
+                                      unit: 'cm',
+                                      onChanged: (value) => setState(() => _height = value),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _buildSliderSection(
+                                      title: 'Weight',
+                                      value: _weight!,
+                                      min: 40,
+                                      max: 120,
+                                      unit: 'kg',
+                                      onChanged: (value) => setState(() => _weight = value),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppTheme.spacingMedium),
+
+                              // Birth Date
+                              Container(
+                                decoration: AppTheme.glassCardDecoration,
+                                padding: AppTheme.glassCardPadding,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Birth Date', style: AppTheme.tagLabelStyle),
+                                    const SizedBox(height: AppTheme.spacingSmall),
+                                    InkWell(
+                                      onTap: () => _selectDate(context),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            DateFormat('dd/MM/yyyy').format(_birthDate!),
+                                            style: AppTheme.tagValueStyle,
+                                          ),
+                                          Icon(Icons.calendar_today, color: AppTheme.secondaryColor),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: AppTheme.spacingMedium),
+
+                              // Activity Level
+                              Container(
+                                decoration: AppTheme.glassCardDecoration,
+                                padding: AppTheme.glassCardPadding,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Activity Level', style: AppTheme.tagLabelStyle),
+                                    const SizedBox(height: AppTheme.spacingSmall),
+                                    Text(
+                                      _getActivityLevelText(_activityLevel!),
+                                      style: AppTheme.tagValueStyle,
+                                    ),
+                                    const SizedBox(height: AppTheme.spacingSmall),
+                                    SliderTheme(
+                                      data: SliderTheme.of(context).copyWith(
+                                        activeTrackColor: AppTheme.secondaryColor,
+                                        inactiveTrackColor: AppTheme.surfaceColor,
+                                        thumbColor: AppTheme.secondaryColor,
+                                        overlayColor: AppTheme.secondaryColor.withOpacity(0.1),
+                                        trackHeight: 8.0,
+                                      ),
+                                      child: Slider(
+                                        value: _activityLevel!.index.toDouble(),
+                                        min: 0,
+                                        max: ActivityLevel.values.length - 1,
+                                        divisions: ActivityLevel.values.length - 1,
+                                        onChanged: (value) {
+                                          setState(() {
+                                            _activityLevel = ActivityLevel.values[value.round()];
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: AppTheme.spacingMedium),
+
+                              // Save Button
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: _isLoading ? null : _saveUserInfo,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.secondaryColor,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: _isLoading
+                                    ? const SizedBox(
+                                        height: 24,
+                                        width: 24,
+                                        child: CircularProgressIndicator(
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Save Changes',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                ),
+                              ),
+                            ],
+                          )
+                        else
+                          Column(
+                            children: [
+                              GridView.count(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                crossAxisCount: 2,
+                                mainAxisSpacing: AppTheme.spacingMedium,
+                                crossAxisSpacing: AppTheme.spacingMedium,
+                                childAspectRatio: 1.0,
+                                children: [
+                                  _buildSummaryCard(
+                                    'Gender',
+                                    _userInfo?.gender.toString().split('.').last.capitalize() ?? 'Not set',
+                                    Icons.person,
+                                  ),
+                                  _buildSummaryCard(
+                                    'Height',
+                                    _userInfo?.height != null ? '${_userInfo!.height} cm' : 'Not set',
+                                    Icons.height,
+                                  ),
+                                  _buildSummaryCard(
+                                    'Weight',
+                                    _userInfo?.weight != null ? '${_userInfo!.weight} kg' : 'Not set',
+                                    Icons.monitor_weight,
+                                  ),
+                                  _buildSummaryCard(
+                                    'Age',
+                                    _userInfo?.age != null ? '${_userInfo!.age} years' : 'Not set',
+                                    Icons.cake,
+                                  ),
+                                  _buildSummaryCard(
+                                    'Activity Level',
+                                    _userInfo?.activityLevel.toString().split('.').last.capitalize() ?? 'Not set',
+                                    Icons.directions_run,
+                                  ),
+                                  _buildSummaryCard(
+                                    'Daily Intake',
+                                    _userInfo?.recommendedCalories != null ? '${_userInfo!.recommendedCalories.round()} kcal' : 'Not set',
+                                    Icons.restaurant,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppTheme.spacingXLarge),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: () async {
+                                    // Clear stored username before logging out
+                                    await _userService.clearUsernameFromStorage();
+                                    if (mounted) {
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => const LoginScreen(),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.secondaryColor,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  icon: const Icon(
+                                    Icons.logout,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  label: const Text(
+                                    'Logout',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                   ),

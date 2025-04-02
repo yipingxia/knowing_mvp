@@ -3,6 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/user_service.dart';
 import 'home_screen.dart';
 import '../theme/app_theme.dart';
+import '../services/user_info_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'user_info_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -84,12 +87,27 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       );
 
       if (success && mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => HomeScreen(username: _usernameController.text),
-          ),
-        );
+        // After successful registration, check if user info exists
+        final userInfoService = UserInfoService(FirebaseFirestore.instance);
+        final userInfo = await userInfoService.getUserInfo();
+
+        if (userInfo == null && mounted) {
+          // If no user info exists, redirect to UserInfoScreen in edit mode
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const UserInfoScreen(forceEdit: true),
+            ),
+          );
+        } else if (mounted) {
+          // If user info exists, proceed to home screen
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => HomeScreen(username: _usernameController.text),
+            ),
+          );
+        }
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Registration failed')),

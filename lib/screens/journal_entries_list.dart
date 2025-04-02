@@ -76,13 +76,12 @@ class _JournalEntriesListScreenState extends State<JournalEntriesListScreen> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: Center(
-          child: ConstrainedBox(
-            constraints: AppTheme.maxWidthConstraint,
-            child: Text(
-              'Journal Entries',
-              style: AppTheme.appBarTitleStyle,
-            ),
+        centerTitle: true,
+        title: ConstrainedBox(
+          constraints: AppTheme.maxWidthConstraint,
+          child: Text(
+            'Journal Entries',
+            style: AppTheme.appBarTitleStyle,
           ),
         ),
         elevation: 0,

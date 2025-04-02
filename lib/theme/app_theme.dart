@@ -86,7 +86,7 @@ class AppTheme {
 
   static TextStyle get appBarTitleStyle => GoogleFonts.unna(
     color: primaryColor,
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: FontWeight.w500,
   );
 

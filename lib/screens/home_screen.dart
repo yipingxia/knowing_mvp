@@ -278,22 +278,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       children: [
         const SizedBox(height: AppTheme.spacingMedium),
         // Grid of recommendation cards
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          childAspectRatio: 1.0,
-          padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingLarge),
-          children: sortedRecommendations.entries.map((entry) {
-            final title = entry.key.replaceAll('_', ' ').toUpperCase();
-            return GlassCard(
-              title: title,
-              recommendations: entry.value,
-              rotationAngle: 0,
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isWideScreen = constraints.maxWidth > 600;
+            return GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: isWideScreen ? 2 : 1,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: isWideScreen ? 1.0 : 1.2,
+              padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingLarge),
+              children: sortedRecommendations.entries.map((entry) {
+                final title = entry.key.replaceAll('_', ' ').toUpperCase();
+                return GlassCard(
+                  title: title,
+                  recommendations: entry.value,
+                  rotationAngle: 0,
+                );
+              }).toList(),
             );
-          }).toList(),
+          },
         ),
       ],
     );
@@ -409,13 +414,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: Center(
-          child: ConstrainedBox(
-            constraints: AppTheme.maxWidthConstraint,
-            child: Text(
-              'Get Knowing',
-              style: AppTheme.appBarTitleStyle,
-            ),
+        centerTitle: true,
+        title: ConstrainedBox(
+          constraints: AppTheme.maxWidthConstraint,
+          child: Text(
+            'Get Knowing',
+            style: AppTheme.appBarTitleStyle,
           ),
         ),
         actions: [
@@ -478,7 +482,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             )
                           : Text(
                               'Submit Entry',
-                              style: AppTheme.cardTitleStyle,
+                              style: AppTheme.cardTitleStyle.copyWith(
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
                             ),
                       ),
                     ),

@@ -301,21 +301,20 @@ class _InteractiveInputScreenState extends State<InteractiveInputScreen> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: Center(
-          child: ConstrainedBox(
-            constraints: AppTheme.maxWidthConstraint,
-            child: Column(
-              children: [
-                Text(
-                  'Daily Check-in',
-                  style: AppTheme.titleStyle,
-                ),
-                Text(
-                  formattedDate,
-                  style: AppTheme.dateStyle,
-                ),
-              ],
-            ),
+        centerTitle: true,
+        title: ConstrainedBox(
+          constraints: AppTheme.maxWidthConstraint,
+          child: Column(
+            children: [
+              Text(
+                'Daily Check-in',
+                style: AppTheme.appBarTitleStyle,
+              ),
+              Text(
+                formattedDate,
+                style: AppTheme.dateStyle,
+              ),
+            ],
           ),
         ),
         elevation: 0,
